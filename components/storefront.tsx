@@ -7,17 +7,17 @@ import { FilterBar } from './filter-bar'
 import { ItemGrid } from './item-grid'
 import { BundleSection } from './bundle-section'
 import { ItemDetailModal } from './item-detail-modal'
-import type { Category, ItemStatus, Item } from '@/lib/types'
+import type { Category, Item } from '@/lib/types'
 
-type SortOption = 'priority' | 'price-asc' | 'price-desc' | 'newest'
+type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'newest'
 
 export function Storefront() {
-  const { data, t } = useApp()
+  const { data, loading } = useApp()
   
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<Category | 'all'>('all')
   const [showSold, setShowSold] = useState(false)
-  const [sortBy, setSortBy] = useState<SortOption>('priority')
+  const [sortBy, setSortBy] = useState<SortOption>('featured')
   const [selectedItem, setSelectedItem] = useState<Item | null>(null)
 
   const filteredItems = useMemo(() => {
@@ -27,10 +27,10 @@ export function Storefront() {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       items = items.filter(item => 
-        item.title.en.toLowerCase().includes(query) ||
-        item.title.zh.toLowerCase().includes(query) ||
-        item.description.en.toLowerCase().includes(query) ||
-        item.description.zh.toLowerCase().includes(query) ||
+        item.title_zh.toLowerCase().includes(query) ||
+        (item.title_en?.toLowerCase().includes(query)) ||
+        (item.description_zh?.toLowerCase().includes(query)) ||
+        (item.description_en?.toLowerCase().includes(query)) ||
         item.tags?.some(tag => tag.toLowerCase().includes(query))
       )
     }
@@ -47,8 +47,14 @@ export function Storefront() {
 
     // Sort
     switch (sortBy) {
-      case 'priority':
-        items.sort((a, b) => a.sell_priority - b.sell_priority)
+      case 'featured':
+        items.sort((a, b) => {
+          // Featured items first
+          if (a.featured && !b.featured) return -1
+          if (!a.featured && b.featured) return 1
+          // Then by sort_order
+          return a.sort_order - b.sort_order
+        })
         break
       case 'price-asc':
         items.sort((a, b) => a.asking_price - b.asking_price)
@@ -57,13 +63,34 @@ export function Storefront() {
         items.sort((a, b) => b.asking_price - a.asking_price)
         break
       case 'newest':
-        // Assuming items are added in order, reverse to show newest first
-        items.reverse()
+        items.sort((a, b) => {
+          const dateA = new Date(a.created_at || 0).getTime()
+          const dateB = new Date(b.created_at || 0).getTime()
+          return dateB - dateA
+        })
         break
     }
 
     return items
   }, [data.items, searchQuery, selectedCategory, showSold, sortBy])
+
+  const enabledBundles = data.bundles.filter(b => b.enabled)
+
+  if (loading) {
+    return (
+      <div className="flex flex-col">
+        <div className="h-64 bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 animate-pulse" />
+        <div className="container px-4 py-8">
+          <div className="h-12 bg-muted rounded-lg animate-pulse mb-6" />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="aspect-[4/3] bg-muted rounded-lg animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col">
@@ -86,7 +113,7 @@ export function Storefront() {
           onItemClick={setSelectedItem}
         />
 
-        {data.bundles.length > 0 && (
+        {enabledBundles.length > 0 && (
           <BundleSection onItemClick={setSelectedItem} />
         )}
       </div>

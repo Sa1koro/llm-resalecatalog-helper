@@ -5,14 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useApp } from '@/lib/app-context'
-import { CATEGORY_ICONS, type Item } from '@/lib/types'
+import { CATEGORY_ICONS, getBundleName, getBundleDescription, getItemTitle, type Item } from '@/lib/types'
 
 interface BundleSectionProps {
   onItemClick: (item: Item) => void
 }
 
 export function BundleSection({ onItemClick }: BundleSectionProps) {
-  const { data, t, getItemsInBundle, calculateBundleSavings, calculateTotalIndividualPrice } = useApp()
+  const { data, lang, t, getItemsInBundle, calculateBundleSavings, calculateBundlePrice } = useApp()
 
   const sectionTitle = { en: 'Bundle Deals', zh: '打包优惠' }
   const saveLabel = { en: 'Save', zh: '省' }
@@ -20,7 +20,9 @@ export function BundleSection({ onItemClick }: BundleSectionProps) {
   const individualPriceLabel = { en: 'Individual price', zh: '单买价格' }
   const bundlePriceLabel = { en: 'Bundle price', zh: '套装价格' }
 
-  if (data.bundles.length === 0) return null
+  const enabledBundles = data.bundles.filter(b => b.enabled)
+  
+  if (enabledBundles.length === 0) return null
 
   return (
     <section className="mt-12 pt-8 border-t">
@@ -30,29 +32,31 @@ export function BundleSection({ onItemClick }: BundleSectionProps) {
       </h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {data.bundles.map((bundle) => {
+        {enabledBundles.map((bundle) => {
           const items = getItemsInBundle(bundle.id)
+          const bundlePrice = calculateBundlePrice(bundle)
           const savings = calculateBundleSavings(bundle)
-          const individualTotal = calculateTotalIndividualPrice(bundle)
-          const savingsPercent = Math.round((savings / individualTotal) * 100)
+          const individualTotal = items.reduce((sum, i) => sum + i.asking_price, 0)
+          
+          if (items.length === 0) return null
 
           return (
             <Card key={bundle.id} className="overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <CardTitle className="text-lg">
-                    {t(bundle.title)}
+                    {getBundleName(bundle, lang)}
                   </CardTitle>
                   <Badge className="bg-primary text-primary-foreground relative overflow-hidden">
                     <span className="relative z-10">
-                      {t(saveLabel)} ${savings}
+                      {t(saveLabel)} ¥{savings.toFixed(0)}
                     </span>
                     <span className="absolute inset-0 animate-shimmer" />
                   </Badge>
                 </div>
-                {bundle.description && (
+                {getBundleDescription(bundle, lang) && (
                   <p className="text-sm text-muted-foreground">
-                    {t(bundle.description)}
+                    {getBundleDescription(bundle, lang)}
                   </p>
                 )}
               </CardHeader>
@@ -69,7 +73,7 @@ export function BundleSection({ onItemClick }: BundleSectionProps) {
                       {item.images.length > 0 ? (
                         <img
                           src={item.images[0]}
-                          alt={t(item.title)}
+                          alt={getItemTitle(item, lang)}
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -88,13 +92,13 @@ export function BundleSection({ onItemClick }: BundleSectionProps) {
                   <div>
                     <p className="text-xs text-muted-foreground">{t(individualPriceLabel)}</p>
                     <p className="text-sm line-through text-muted-foreground">
-                      ${individualTotal}
+                      ¥{individualTotal}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">{t(bundlePriceLabel)}</p>
                     <p className="text-xl font-bold text-primary">
-                      ${bundle.bundle_price}
+                      ¥{bundlePrice.toFixed(0)}
                     </p>
                   </div>
                 </div>
@@ -104,7 +108,7 @@ export function BundleSection({ onItemClick }: BundleSectionProps) {
                   {items.map((item) => (
                     <li key={item.id} className="flex items-center gap-2">
                       <span>{CATEGORY_ICONS[item.category]}</span>
-                      <span className="line-clamp-1">{t(item.title)}</span>
+                      <span className="line-clamp-1">{getItemTitle(item, lang)}</span>
                     </li>
                   ))}
                 </ul>

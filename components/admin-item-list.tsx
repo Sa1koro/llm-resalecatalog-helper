@@ -8,9 +8,8 @@ import {
   Trash2, 
   Copy, 
   FileText, 
-  ChevronUp, 
-  ChevronDown,
-  Package
+  Package,
+  Star
 } from 'lucide-react'
 import {
   Table,
@@ -46,11 +45,10 @@ import {
   CATEGORY_ICONS, 
   CONDITION_LABELS, 
   STATUS_LABELS,
-  PRIORITY_LABELS,
+  getItemTitle,
   type Item,
   type ItemStatus
 } from '@/lib/types'
-import { cn } from '@/lib/utils'
 
 interface AdminItemListProps {
   viewMode: 'grid' | 'list'
@@ -59,7 +57,7 @@ interface AdminItemListProps {
 }
 
 export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemListProps) {
-  const { data, t, deleteItem, duplicateItem, updateItemStatus, reorderItems } = useApp()
+  const { data, t, lang, deleteItem, duplicateItem, updateItemStatus, updateItem } = useApp()
   const [deleteConfirm, setDeleteConfirm] = useState<Item | null>(null)
 
   const labels = {
@@ -69,12 +67,13 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
     condition: { en: 'Condition', zh: '成色' },
     price: { en: 'Price', zh: '价格' },
     status: { en: 'Status', zh: '状态' },
-    priority: { en: 'Priority', zh: '优先级' },
+    featured: { en: 'Featured', zh: '推荐' },
     actions: { en: 'Actions', zh: '操作' },
     edit: { en: 'Edit', zh: '编辑' },
     duplicate: { en: 'Duplicate', zh: '复制' },
     generatePost: { en: 'Generate Post', zh: '生成帖子' },
     delete: { en: 'Delete', zh: '删除' },
+    toggleFeatured: { en: 'Toggle Featured', zh: '切换推荐' },
     deleteConfirmTitle: { en: 'Delete Item', zh: '删除物品' },
     deleteConfirmDescription: { en: 'Are you sure you want to delete this item? This action cannot be undone.', zh: '确定要删除此物品吗？此操作无法撤销。' },
     cancel: { en: 'Cancel', zh: '取消' },
@@ -83,12 +82,12 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
     addFirst: { en: 'Add your first item to get started!', zh: '添加第一个物品开始吧！' },
   }
 
-  const cycleStatus = (item: Item) => {
+  const cycleStatus = async (item: Item) => {
     const statusOrder: ItemStatus[] = ['available', 'reserved', 'sold']
     const currentIndex = statusOrder.indexOf(item.status)
     const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length]
     
-    updateItemStatus(item.id, nextStatus)
+    await updateItemStatus(item.id, nextStatus)
     
     // Confetti on sold
     if (nextStatus === 'sold') {
@@ -100,6 +99,10 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
     }
   }
 
+  const toggleFeatured = async (item: Item) => {
+    await updateItem(item.id, { featured: !item.featured })
+  }
+
   const getStatusBadgeVariant = (status: ItemStatus) => {
     switch (status) {
       case 'available': return 'default'
@@ -108,32 +111,10 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
     }
   }
 
-  const getPriorityBadge = (priority: number) => {
-    if (priority <= 2) {
-      return <Badge variant="destructive" className="bg-primary">{t(PRIORITY_LABELS[priority])}</Badge>
-    }
-    if (priority === 3) {
-      return <Badge variant="outline" className="bg-secondary/20">{t(PRIORITY_LABELS[priority])}</Badge>
-    }
-    return <Badge variant="secondary">{t(PRIORITY_LABELS[priority])}</Badge>
-  }
-
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteConfirm) {
-      deleteItem(deleteConfirm.id)
+      await deleteItem(deleteConfirm.id)
       setDeleteConfirm(null)
-    }
-  }
-
-  const handleMoveUp = (index: number) => {
-    if (index > 0) {
-      reorderItems(index, index - 1)
-    }
-  }
-
-  const handleMoveDown = (index: number) => {
-    if (index < data.items.length - 1) {
-      reorderItems(index, index + 1)
     }
   }
 
@@ -157,13 +138,13 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
     return (
       <>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {data.items.map((item, index) => (
+          {data.items.map((item) => (
             <Card key={item.id} className="overflow-hidden">
               <div className="relative aspect-[4/3] bg-muted">
                 {item.images.length > 0 ? (
                   <img
                     src={item.images[0]}
-                    alt={t(item.title)}
+                    alt={getItemTitle(item, lang)}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -180,12 +161,18 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
                 >
                   {t(STATUS_LABELS[item.status])}
                 </Badge>
+                {item.featured && (
+                  <Badge className="absolute top-2 left-2 bg-primary">
+                    <Star className="h-3 w-3 mr-1 fill-current" />
+                    {lang === 'zh' ? '推荐' : 'Featured'}
+                  </Badge>
+                )}
               </div>
               <CardContent className="p-3">
-                <h4 className="font-medium line-clamp-1 mb-1">{t(item.title)}</h4>
-                <p className="text-lg font-bold text-primary mb-2">${item.asking_price}</p>
+                <h4 className="font-medium line-clamp-1 mb-1">{getItemTitle(item, lang)}</h4>
+                <p className="text-lg font-bold text-primary mb-2">¥{item.asking_price}</p>
                 <div className="flex items-center justify-between">
-                  {getPriorityBadge(item.sell_priority)}
+                  <Badge variant="outline">{t(CONDITION_LABELS[item.condition])}</Badge>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -204,6 +191,10 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
                       <DropdownMenuItem onClick={() => onGeneratePost(item)}>
                         <FileText className="h-4 w-4 mr-2" />
                         {t(labels.generatePost)}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toggleFeatured(item)}>
+                        <Star className="h-4 w-4 mr-2" />
+                        {t(labels.toggleFeatured)}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
@@ -253,19 +244,19 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
               <TableHead className="hidden lg:table-cell">{t(labels.condition)}</TableHead>
               <TableHead>{t(labels.price)}</TableHead>
               <TableHead>{t(labels.status)}</TableHead>
-              <TableHead className="hidden sm:table-cell">{t(labels.priority)}</TableHead>
+              <TableHead className="hidden sm:table-cell">{t(labels.featured)}</TableHead>
               <TableHead className="w-24">{t(labels.actions)}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.items.map((item, index) => (
+            {data.items.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>
                   <div className="w-12 h-12 rounded-md bg-muted overflow-hidden">
                     {item.images.length > 0 ? (
                       <img
                         src={item.images[0]}
-                        alt={t(item.title)}
+                        alt={getItemTitle(item, lang)}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -278,7 +269,7 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
                   </div>
                 </TableCell>
                 <TableCell className="font-medium max-w-[200px] truncate">
-                  {t(item.title)}
+                  {getItemTitle(item, lang)}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {CATEGORY_ICONS[item.category]} {t(CATEGORY_LABELS[item.category])}
@@ -287,7 +278,7 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
                   <Badge variant="outline">{t(CONDITION_LABELS[item.condition])}</Badge>
                 </TableCell>
                 <TableCell className="font-bold text-primary">
-                  ${item.asking_price}
+                  ¥{item.asking_price}
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -299,29 +290,14 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
-                  <div className="flex items-center gap-1">
-                    {getPriorityBadge(item.sell_priority)}
-                    <div className="flex flex-col ml-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => handleMoveUp(index)}
-                        disabled={index === 0}
-                      >
-                        <ChevronUp className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => handleMoveDown(index)}
-                        disabled={index === data.items.length - 1}
-                      >
-                        <ChevronDown className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
+                  <Button
+                    variant={item.featured ? 'default' : 'ghost'}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => toggleFeatured(item)}
+                  >
+                    <Star className={`h-4 w-4 ${item.featured ? 'fill-current' : ''}`} />
+                  </Button>
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>

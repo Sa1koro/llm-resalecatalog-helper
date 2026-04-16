@@ -16,7 +16,7 @@ import { useApp } from '@/lib/app-context'
 import { CATEGORY_LABELS, CATEGORY_ICONS, type Category } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-type SortOption = 'priority' | 'price-asc' | 'price-desc' | 'newest'
+type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'newest'
 
 interface FilterBarProps {
   searchQuery: string
@@ -50,10 +50,10 @@ export function FilterBar({
   sortBy,
   onSortChange,
 }: FilterBarProps) {
-  const { lang, t } = useApp()
+  const { t } = useApp()
 
   const sortOptions: { value: SortOption; label: { en: string; zh: string } }[] = [
-    { value: 'priority', label: { en: 'Recommended', zh: '推荐排序' } },
+    { value: 'featured', label: { en: 'Featured', zh: '推荐排序' } },
     { value: 'price-asc', label: { en: 'Price: Low to High', zh: '价格从低到高' } },
     { value: 'price-desc', label: { en: 'Price: High to Low', zh: '价格从高到低' } },
     { value: 'newest', label: { en: 'Newest', zh: '最新发布' } },
