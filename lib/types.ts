@@ -6,52 +6,77 @@ export type Condition = 'like-new' | 'good' | 'fair' | 'well-loved'
 
 export type ItemStatus = 'available' | 'reserved' | 'sold'
 
+export type ContactPlatform = 'wechat' | 'xiaohongshu' | 'phone' | 'facebook' | 'discord' | 'qq'
+
 export interface BilingualText {
   en: string
   zh: string
 }
 
+export interface ContactMethod {
+  id: string
+  platform: ContactPlatform
+  value: string
+  label?: string
+  enabled: boolean
+  sort_order: number
+}
+
+export interface Settings {
+  id: string
+  seller_name: string
+  location: string | null
+  moving_date: string | null
+  admin_password: string
+}
+
 export interface Item {
   id: string
-  title: BilingualText
+  title_zh: string
+  title_en: string | null
+  description_zh: string | null
+  description_en: string | null
   category: Category
   condition: Condition
   images: string[]
-  original_price: number
+  original_price: number | null
   asking_price: number
-  description: BilingualText
-  purchase_link?: string
-  review_links?: string[]
-  available_from?: string
-  available_until?: string
-  allow_viewing: boolean
-  sell_priority: number // 1-5, where 1 is "sell first"
   status: ItemStatus
-  bundle_ids?: string[]
-  tags?: string[]
-  notes?: BilingualText
+  bundle_id: string | null
+  tags: string[]
+  featured: boolean
+  sort_order: number
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Bundle {
   id: string
-  title: BilingualText
-  item_ids: string[]
-  bundle_price: number
-  description?: BilingualText
+  name_zh: string
+  name_en: string | null
+  description_zh: string | null
+  description_en: string | null
+  discount_percent: number
+  enabled: boolean
+  sort_order: number
+  created_at?: string
+  updated_at?: string
 }
 
+export interface AppData {
+  settings: Settings
+  contactMethods: ContactMethod[]
+  items: Item[]
+  bundles: Bundle[]
+}
+
+// Legacy compatibility types
 export interface SellerMeta {
   seller_name: string
   location: string
   contact: string
   moving_date: string
   currency: string
-}
-
-export interface AppData {
-  meta: SellerMeta
-  items: Item[]
-  bundles: Bundle[]
 }
 
 // UI Labels
@@ -88,10 +113,54 @@ export const STATUS_LABELS: Record<ItemStatus, BilingualText> = {
   sold: { en: 'Sold', zh: '已售出' },
 }
 
-export const PRIORITY_LABELS: Record<number, BilingualText> = {
-  1: { en: 'Sell ASAP', zh: '急售' },
-  2: { en: 'Sell Soon', zh: '尽快出' },
-  3: { en: 'No Rush', zh: '不急' },
-  4: { en: 'Later', zh: '稍后' },
-  5: { en: 'Keep Until Moving', zh: '搬家前再卖' },
+export const CONTACT_PLATFORM_INFO: Record<ContactPlatform, { label: BilingualText; icon: string; urlPrefix?: string; copyable?: boolean }> = {
+  wechat: { 
+    label: { en: 'WeChat', zh: '微信' }, 
+    icon: 'MessageCircle',
+    copyable: true
+  },
+  xiaohongshu: { 
+    label: { en: 'Xiaohongshu', zh: '小红书' }, 
+    icon: 'BookOpen',
+    urlPrefix: 'https://www.xiaohongshu.com/user/profile/'
+  },
+  phone: { 
+    label: { en: 'Phone/SMS', zh: '电话/短信' }, 
+    icon: 'Phone',
+    urlPrefix: 'tel:'
+  },
+  facebook: { 
+    label: { en: 'Facebook', zh: 'Facebook' }, 
+    icon: 'Facebook',
+    urlPrefix: 'https://facebook.com/'
+  },
+  discord: { 
+    label: { en: 'Discord', zh: 'Discord' }, 
+    icon: 'MessageSquare',
+    urlPrefix: 'https://discord.gg/'
+  },
+  qq: { 
+    label: { en: 'QQ', zh: 'QQ' }, 
+    icon: 'MessageCircle',
+    copyable: true
+  },
+}
+
+// Helper function to get bilingual text from item
+export function getItemTitle(item: Item, lang: Language): string {
+  return lang === 'zh' ? item.title_zh : (item.title_en || item.title_zh)
+}
+
+export function getItemDescription(item: Item, lang: Language): string {
+  if (lang === 'zh') return item.description_zh || ''
+  return item.description_en || item.description_zh || ''
+}
+
+export function getBundleName(bundle: Bundle, lang: Language): string {
+  return lang === 'zh' ? bundle.name_zh : (bundle.name_en || bundle.name_zh)
+}
+
+export function getBundleDescription(bundle: Bundle, lang: Language): string {
+  if (lang === 'zh') return bundle.description_zh || ''
+  return bundle.description_en || bundle.description_zh || ''
 }

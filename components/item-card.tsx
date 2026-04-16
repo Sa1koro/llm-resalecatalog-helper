@@ -1,6 +1,6 @@
 'use client'
 
-import { Calendar, Eye, Gift } from 'lucide-react'
+import { Gift } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import {
   CATEGORY_ICONS, 
   CONDITION_LABELS, 
   STATUS_LABELS,
+  getItemTitle,
   type Item 
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -20,45 +21,20 @@ interface ItemCardProps {
 }
 
 export function ItemCard({ item, onClick }: ItemCardProps) {
-  const { t, data, getBundlesForItem } = useApp()
+  const { t, lang, getBundleById } = useApp()
   
-  const bundles = getBundlesForItem(item.id)
-  const hasBundle = bundles.length > 0
+  const bundle = item.bundle_id ? getBundleById(item.bundle_id) : null
+  const hasBundle = bundle?.enabled
   
-  const discountPercent = Math.round(
-    ((item.original_price - item.asking_price) / item.original_price) * 100
-  )
+  const discountPercent = item.original_price 
+    ? Math.round(((item.original_price - item.asking_price) / item.original_price) * 100)
+    : 0
 
   const isSold = item.status === 'sold'
   const isReserved = item.status === 'reserved'
 
   const viewDetailsLabel = { en: 'View Details', zh: '查看详情' }
-  const availableLabel = { en: 'Available', zh: '可购买' }
   const bundleAvailableLabel = { en: 'Bundle available', zh: '可打包' }
-  const viewableLabel = { en: 'Viewable', zh: '可预览' }
-
-  // Format availability dates
-  const formatDateRange = () => {
-    if (!item.available_from && !item.available_until) return null
-    
-    const formatDate = (dateStr: string) => {
-      const date = new Date(dateStr)
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    }
-
-    if (item.available_from && item.available_until) {
-      return `${formatDate(item.available_from)} - ${formatDate(item.available_until)}`
-    }
-    if (item.available_from) {
-      return `From ${formatDate(item.available_from)}`
-    }
-    if (item.available_until) {
-      return `Until ${formatDate(item.available_until)}`
-    }
-    return null
-  }
-
-  const dateRange = formatDateRange()
 
   return (
     <Card 
@@ -73,7 +49,7 @@ export function ItemCard({ item, onClick }: ItemCardProps) {
         {item.images.length > 0 ? (
           <img
             src={item.images[0]}
-            alt={t(item.title)}
+            alt={getItemTitle(item, lang)}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
@@ -92,7 +68,7 @@ export function ItemCard({ item, onClick }: ItemCardProps) {
             !isSold && !isReserved && 'bg-secondary text-secondary-foreground'
           )}
         >
-          {isSold ? '✓' : isReserved ? '🔖' : '🌿'} {t(STATUS_LABELS[item.status])}
+          {t(STATUS_LABELS[item.status])}
         </Badge>
         
         {/* Condition badge */}
@@ -102,12 +78,19 @@ export function ItemCard({ item, onClick }: ItemCardProps) {
         >
           {t(CONDITION_LABELS[item.condition])}
         </Badge>
+
+        {/* Featured badge */}
+        {item.featured && (
+          <Badge className="absolute bottom-2 left-2 bg-primary text-primary-foreground">
+            {lang === 'zh' ? '推荐' : 'Featured'}
+          </Badge>
+        )}
       </div>
       
       <CardContent className="p-4">
         {/* Title */}
         <h3 className="font-medium text-foreground line-clamp-1 mb-1">
-          {t(item.title)}
+          {getItemTitle(item, lang)}
         </h3>
         
         {/* Category */}
@@ -118,34 +101,24 @@ export function ItemCard({ item, onClick }: ItemCardProps) {
         {/* Price row */}
         <div className="flex items-baseline gap-2 mb-3">
           <span className="text-lg font-bold text-primary">
-            {data.meta.currency} ${item.asking_price}
+            ¥{item.asking_price}
           </span>
-          <span className="text-sm text-muted-foreground line-through">
-            ${item.original_price}
-          </span>
-          {discountPercent > 0 && (
-            <Badge variant="destructive" className="bg-primary text-primary-foreground text-xs">
-              -{discountPercent}%
-            </Badge>
+          {item.original_price && (
+            <>
+              <span className="text-sm text-muted-foreground line-through">
+                ¥{item.original_price}
+              </span>
+              {discountPercent > 0 && (
+                <Badge variant="destructive" className="bg-primary text-primary-foreground text-xs">
+                  -{discountPercent}%
+                </Badge>
+              )}
+            </>
           )}
         </div>
         
         {/* Info chips */}
         <div className="flex flex-wrap gap-1.5 mb-3">
-          {dateRange && (
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              <Calendar className="h-3 w-3" />
-              {dateRange}
-            </span>
-          )}
-          
-          {item.allow_viewing && (
-            <span className="inline-flex items-center gap-1 text-xs text-secondary-foreground bg-secondary/20 px-2 py-0.5 rounded-full">
-              <Eye className="h-3 w-3" />
-              {t(viewableLabel)}
-            </span>
-          )}
-          
           {hasBundle && (
             <span className="inline-flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
               <Gift className="h-3 w-3" />

@@ -1,28 +1,54 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
-import type { AppData, Item, Bundle, Language, ItemStatus } from './types'
-import { sampleData } from './sample-data'
+import type { AppData, Item, Bundle, Language, ItemStatus, Settings, ContactMethod } from './types'
+import { createClient } from './supabase/client'
 
 type Route = 'shop' | 'admin' | 'prompt-tool' | 'import'
 
+const DEFAULT_SETTINGS: Settings = {
+  id: '',
+  seller_name: 'ResaleBox',
+  location: null,
+  moving_date: null,
+  admin_password: 'resale2026',
+}
+
+const DEFAULT_DATA: AppData = {
+  settings: DEFAULT_SETTINGS,
+  contactMethods: [],
+  items: [],
+  bundles: [],
+}
+
 interface AppContextValue {
+  // Loading state
+  loading: boolean
+  error: string | null
+  
   // Data
   data: AppData
-  setData: (data: AppData) => void
+  refreshData: () => Promise<void>
+  
+  // Settings
+  updateSettings: (settings: Partial<Settings>) => Promise<void>
+  
+  // Contact Methods
+  addContactMethod: (method: Omit<ContactMethod, 'id'>) => Promise<void>
+  updateContactMethod: (id: string, method: Partial<ContactMethod>) => Promise<void>
+  deleteContactMethod: (id: string) => Promise<void>
   
   // Items CRUD
-  addItem: (item: Item) => void
-  updateItem: (id: string, item: Partial<Item>) => void
-  deleteItem: (id: string) => void
-  duplicateItem: (id: string) => Item
-  updateItemStatus: (id: string, status: ItemStatus) => void
-  reorderItems: (fromIndex: number, toIndex: number) => void
+  addItem: (item: Omit<Item, 'id' | 'created_at' | 'updated_at'>) => Promise<Item>
+  updateItem: (id: string, item: Partial<Item>) => Promise<void>
+  deleteItem: (id: string) => Promise<void>
+  duplicateItem: (id: string) => Promise<Item>
+  updateItemStatus: (id: string, status: ItemStatus) => Promise<void>
   
   // Bundles CRUD
-  addBundle: (bundle: Bundle) => void
-  updateBundle: (id: string, bundle: Partial<Bundle>) => void
-  deleteBundle: (id: string) => void
+  addBundle: (bundle: Omit<Bundle, 'id' | 'created_at' | 'updated_at'>) => Promise<Bundle>
+  updateBundle: (id: string, bundle: Partial<Bundle>) => Promise<void>
+  deleteBundle: (id: string) => Promise<void>
   
   // Language
   lang: Language
@@ -36,6 +62,8 @@ interface AppContextValue {
   // Routing
   route: Route
   setRoute: (route: Route) => void
+  selectedItemId: string | null
+  setSelectedItemId: (id: string | null) => void
   
   // Auth
   isAuthenticated: boolean
@@ -46,30 +74,81 @@ interface AppContextValue {
   getItemById: (id: string) => Item | undefined
   getBundleById: (id: string) => Bundle | undefined
   getItemsInBundle: (bundleId: string) => Item[]
-  getBundlesForItem: (itemId: string) => Bundle[]
+  calculateBundlePrice: (bundle: Bundle) => number
   calculateBundleSavings: (bundle: Bundle) => number
-  calculateTotalIndividualPrice: (bundle: Bundle) => number
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
 
-const ADMIN_PASSWORD = 'resale2026'
-
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<AppData>(sampleData)
+  const [data, setData] = useState<AppData>(DEFAULT_DATA)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [lang, setLang] = useState<Language>('zh')
   const [isDark, setIsDark] = useState(false)
   const [route, setRouteState] = useState<Route>('shop')
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  const supabase = createClient()
+
+  // Fetch all data from Supabase
+  const refreshData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const [settingsRes, contactsRes, itemsRes, bundlesRes] = await Promise.all([
+        supabase.from('settings').select('*').limit(1).single(),
+        supabase.from('contact_methods').select('*').order('sort_order'),
+        supabase.from('items').select('*').order('sort_order'),
+        supabase.from('bundles').select('*').order('sort_order'),
+      ])
+
+      // If no settings exist, create default
+      let settings = settingsRes.data
+      if (!settings) {
+        const { data: newSettings } = await supabase
+          .from('settings')
+          .insert([{ seller_name: 'ResaleBox', admin_password: 'resale2026' }])
+          .select()
+          .single()
+        settings = newSettings
+      }
+
+      setData({
+        settings: settings || DEFAULT_SETTINGS,
+        contactMethods: contactsRes.data || [],
+        items: itemsRes.data || [],
+        bundles: bundlesRes.data || [],
+      })
+    } catch (err) {
+      console.error('Failed to fetch data:', err)
+      setError('Failed to load data')
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase])
+
+  // Initial data fetch
+  useEffect(() => {
+    refreshData()
+  }, [refreshData])
 
   // Handle hash-based routing
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.slice(1) as Route
-      if (['shop', 'admin', 'prompt-tool', 'import'].includes(hash)) {
-        setRouteState(hash)
+      const hash = window.location.hash.slice(1)
+      const [routePart, itemPart] = hash.split('/item/')
+      
+      if (['shop', 'admin', 'prompt-tool', 'import'].includes(routePart)) {
+        setRouteState(routePart as Route)
       } else {
         setRouteState('shop')
+      }
+      
+      if (itemPart) {
+        setSelectedItemId(itemPart)
       }
     }
 
@@ -108,100 +187,200 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Auth
   const authenticate = useCallback((password: string) => {
-    if (password === ADMIN_PASSWORD) {
+    if (password === data.settings.admin_password) {
       setIsAuthenticated(true)
       return true
     }
     return false
-  }, [])
+  }, [data.settings.admin_password])
 
   const logout = useCallback(() => {
     setIsAuthenticated(false)
     setRoute('shop')
   }, [setRoute])
 
+  // Settings
+  const updateSettings = useCallback(async (updates: Partial<Settings>) => {
+    const { error } = await supabase
+      .from('settings')
+      .update(updates)
+      .eq('id', data.settings.id)
+    
+    if (!error) {
+      setData(prev => ({
+        ...prev,
+        settings: { ...prev.settings, ...updates }
+      }))
+    }
+  }, [supabase, data.settings.id])
+
+  // Contact Methods
+  const addContactMethod = useCallback(async (method: Omit<ContactMethod, 'id'>) => {
+    const { data: newMethod, error } = await supabase
+      .from('contact_methods')
+      .insert([method])
+      .select()
+      .single()
+    
+    if (!error && newMethod) {
+      setData(prev => ({
+        ...prev,
+        contactMethods: [...prev.contactMethods, newMethod]
+      }))
+    }
+  }, [supabase])
+
+  const updateContactMethod = useCallback(async (id: string, updates: Partial<ContactMethod>) => {
+    const { error } = await supabase
+      .from('contact_methods')
+      .update(updates)
+      .eq('id', id)
+    
+    if (!error) {
+      setData(prev => ({
+        ...prev,
+        contactMethods: prev.contactMethods.map(m => m.id === id ? { ...m, ...updates } : m)
+      }))
+    }
+  }, [supabase])
+
+  const deleteContactMethod = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from('contact_methods')
+      .delete()
+      .eq('id', id)
+    
+    if (!error) {
+      setData(prev => ({
+        ...prev,
+        contactMethods: prev.contactMethods.filter(m => m.id !== id)
+      }))
+    }
+  }, [supabase])
+
   // Item CRUD
-  const addItem = useCallback((item: Item) => {
+  const addItem = useCallback(async (item: Omit<Item, 'id' | 'created_at' | 'updated_at'>): Promise<Item> => {
+    const { data: newItem, error } = await supabase
+      .from('items')
+      .insert([item])
+      .select()
+      .single()
+    
+    if (error) throw error
+    
     setData(prev => ({
       ...prev,
-      items: [...prev.items, item]
+      items: [...prev.items, newItem]
     }))
-  }, [])
+    
+    return newItem
+  }, [supabase])
 
-  const updateItem = useCallback((id: string, updates: Partial<Item>) => {
-    setData(prev => ({
-      ...prev,
-      items: prev.items.map(item => 
-        item.id === id ? { ...item, ...updates } : item
-      )
-    }))
-  }, [])
+  const updateItem = useCallback(async (id: string, updates: Partial<Item>) => {
+    const { error } = await supabase
+      .from('items')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    
+    if (!error) {
+      setData(prev => ({
+        ...prev,
+        items: prev.items.map(item => 
+          item.id === id ? { ...item, ...updates } : item
+        )
+      }))
+    }
+  }, [supabase])
 
-  const deleteItem = useCallback((id: string) => {
-    setData(prev => ({
-      ...prev,
-      items: prev.items.filter(item => item.id !== id),
-      bundles: prev.bundles.map(bundle => ({
-        ...bundle,
-        item_ids: bundle.item_ids.filter(itemId => itemId !== id)
-      })).filter(bundle => bundle.item_ids.length > 0)
-    }))
-  }, [])
+  const deleteItem = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from('items')
+      .delete()
+      .eq('id', id)
+    
+    if (!error) {
+      setData(prev => ({
+        ...prev,
+        items: prev.items.filter(item => item.id !== id)
+      }))
+    }
+  }, [supabase])
 
-  const duplicateItem = useCallback((id: string): Item => {
+  const duplicateItem = useCallback(async (id: string): Promise<Item> => {
     const original = data.items.find(item => item.id === id)
     if (!original) throw new Error('Item not found')
     
-    const newItem: Item = {
-      ...original,
-      id: `item-${Date.now()}`,
-      title: {
-        en: `${original.title.en} (Copy)`,
-        zh: `${original.title.zh} (副本)`
-      },
-      status: 'available'
+    const { id: _, created_at, updated_at, ...itemData } = original
+    const newItem = {
+      ...itemData,
+      title_zh: `${original.title_zh} (副本)`,
+      title_en: original.title_en ? `${original.title_en} (Copy)` : null,
+      status: 'available' as ItemStatus,
     }
     
-    addItem(newItem)
-    return newItem
+    return addItem(newItem)
   }, [data.items, addItem])
 
-  const updateItemStatus = useCallback((id: string, status: ItemStatus) => {
-    updateItem(id, { status })
+  const updateItemStatus = useCallback(async (id: string, status: ItemStatus) => {
+    await updateItem(id, { status })
   }, [updateItem])
 
-  const reorderItems = useCallback((fromIndex: number, toIndex: number) => {
-    setData(prev => {
-      const newItems = [...prev.items]
-      const [removed] = newItems.splice(fromIndex, 1)
-      newItems.splice(toIndex, 0, removed)
-      return { ...prev, items: newItems }
-    })
-  }, [])
-
   // Bundle CRUD
-  const addBundle = useCallback((bundle: Bundle) => {
+  const addBundle = useCallback(async (bundle: Omit<Bundle, 'id' | 'created_at' | 'updated_at'>): Promise<Bundle> => {
+    const { data: newBundle, error } = await supabase
+      .from('bundles')
+      .insert([bundle])
+      .select()
+      .single()
+    
+    if (error) throw error
+    
     setData(prev => ({
       ...prev,
-      bundles: [...prev.bundles, bundle]
+      bundles: [...prev.bundles, newBundle]
     }))
-  }, [])
+    
+    return newBundle
+  }, [supabase])
 
-  const updateBundle = useCallback((id: string, updates: Partial<Bundle>) => {
-    setData(prev => ({
-      ...prev,
-      bundles: prev.bundles.map(bundle =>
-        bundle.id === id ? { ...bundle, ...updates } : bundle
-      )
-    }))
-  }, [])
+  const updateBundle = useCallback(async (id: string, updates: Partial<Bundle>) => {
+    const { error } = await supabase
+      .from('bundles')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    
+    if (!error) {
+      setData(prev => ({
+        ...prev,
+        bundles: prev.bundles.map(bundle =>
+          bundle.id === id ? { ...bundle, ...updates } : bundle
+        )
+      }))
+    }
+  }, [supabase])
 
-  const deleteBundle = useCallback((id: string) => {
-    setData(prev => ({
-      ...prev,
-      bundles: prev.bundles.filter(bundle => bundle.id !== id)
-    }))
-  }, [])
+  const deleteBundle = useCallback(async (id: string) => {
+    // First, unlink all items from this bundle
+    await supabase
+      .from('items')
+      .update({ bundle_id: null })
+      .eq('bundle_id', id)
+    
+    const { error } = await supabase
+      .from('bundles')
+      .delete()
+      .eq('id', id)
+    
+    if (!error) {
+      setData(prev => ({
+        ...prev,
+        bundles: prev.bundles.filter(bundle => bundle.id !== id),
+        items: prev.items.map(item => 
+          item.bundle_id === id ? { ...item, bundle_id: null } : item
+        )
+      }))
+    }
+  }, [supabase])
 
   // Helpers
   const getItemById = useCallback((id: string) => {
@@ -213,36 +392,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [data.bundles])
 
   const getItemsInBundle = useCallback((bundleId: string) => {
-    const bundle = data.bundles.find(b => b.id === bundleId)
-    if (!bundle) return []
-    return bundle.item_ids.map(id => data.items.find(item => item.id === id)).filter(Boolean) as Item[]
-  }, [data.bundles, data.items])
+    return data.items.filter(item => item.bundle_id === bundleId)
+  }, [data.items])
 
-  const getBundlesForItem = useCallback((itemId: string) => {
-    return data.bundles.filter(bundle => bundle.item_ids.includes(itemId))
-  }, [data.bundles])
-
-  const calculateTotalIndividualPrice = useCallback((bundle: Bundle) => {
-    return bundle.item_ids.reduce((total, id) => {
-      const item = data.items.find(i => i.id === id)
-      return total + (item?.asking_price || 0)
-    }, 0)
+  const calculateBundlePrice = useCallback((bundle: Bundle) => {
+    const items = data.items.filter(item => item.bundle_id === bundle.id)
+    const totalPrice = items.reduce((sum, item) => sum + item.asking_price, 0)
+    return totalPrice * (1 - bundle.discount_percent / 100)
   }, [data.items])
 
   const calculateBundleSavings = useCallback((bundle: Bundle) => {
-    const individualTotal = calculateTotalIndividualPrice(bundle)
-    return individualTotal - bundle.bundle_price
-  }, [calculateTotalIndividualPrice])
+    const items = data.items.filter(item => item.bundle_id === bundle.id)
+    const totalPrice = items.reduce((sum, item) => sum + item.asking_price, 0)
+    return totalPrice * bundle.discount_percent / 100
+  }, [data.items])
 
   const value: AppContextValue = {
+    loading,
+    error,
     data,
-    setData,
+    refreshData,
+    updateSettings,
+    addContactMethod,
+    updateContactMethod,
+    deleteContactMethod,
     addItem,
     updateItem,
     deleteItem,
     duplicateItem,
     updateItemStatus,
-    reorderItems,
     addBundle,
     updateBundle,
     deleteBundle,
@@ -253,15 +431,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toggleDark,
     route,
     setRoute,
+    selectedItemId,
+    setSelectedItemId,
     isAuthenticated,
     authenticate,
     logout,
     getItemById,
     getBundleById,
     getItemsInBundle,
-    getBundlesForItem,
+    calculateBundlePrice,
     calculateBundleSavings,
-    calculateTotalIndividualPrice,
   }
 
   return (

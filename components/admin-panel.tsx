@@ -1,24 +1,28 @@
 'use client'
 
 import { useState } from 'react'
-import { Lock, Package, CheckCircle, Clock, DollarSign, FileDown, FileUp, Wand2, LayoutGrid, List } from 'lucide-react'
+import { Lock, Package, CheckCircle, Clock, DollarSign, FileDown, FileUp, Wand2, LayoutGrid, List, Settings, Boxes } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApp } from '@/lib/app-context'
 import { AdminItemList } from './admin-item-list'
 import { ItemFormModal } from './item-form-modal'
 import { PostGeneratorModal } from './post-generator-modal'
+import { SettingsPanel } from './settings-panel'
+import { BundleManager } from './bundle-manager'
 import type { Item } from '@/lib/types'
 
 export function AdminPanel() {
-  const { isAuthenticated, authenticate, setRoute, data, t, lang } = useApp()
+  const { isAuthenticated, authenticate, setRoute, data, t, lang, loading } = useApp()
   const [password, setPassword] = useState('')
   const [error, setError] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [postGeneratorItem, setPostGeneratorItem] = useState<Item | null>(null)
+  const [activeTab, setActiveTab] = useState('items')
 
   const labels = {
     title: { en: 'Admin Panel', zh: '管理后台' },
@@ -34,6 +38,9 @@ export function AdminPanel() {
     promptTool: { en: 'Prompt Generator', zh: '提示词生成器' },
     import: { en: 'Import', zh: '导入' },
     export: { en: 'Export JSON', zh: '导出 JSON' },
+    items: { en: 'Items', zh: '物品管理' },
+    bundles: { en: 'Bundles', zh: '套装管理' },
+    settings: { en: 'Settings', zh: '设置' },
   }
 
   const handleLogin = (e: React.FormEvent) => {
@@ -46,7 +53,13 @@ export function AdminPanel() {
   }
 
   const handleExport = () => {
-    const json = JSON.stringify(data, null, 2)
+    const exportData = {
+      settings: data.settings,
+      contactMethods: data.contactMethods,
+      items: data.items,
+      bundles: data.bundles,
+    }
+    const json = JSON.stringify(exportData, null, 2)
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -96,6 +109,22 @@ export function AdminPanel() {
             </form>
           </CardContent>
         </Card>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="container px-4 py-8">
+        <div className="animate-pulse space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-24 bg-muted rounded-lg" />
+            ))}
+          </div>
+          <div className="h-12 bg-muted rounded-lg w-64" />
+          <div className="h-96 bg-muted rounded-lg" />
+        </div>
       </div>
     )
   }
@@ -158,63 +187,88 @@ export function AdminPanel() {
               <DollarSign className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">${stats.totalValue}</p>
+              <p className="text-2xl font-bold">¥{stats.totalValue}</p>
               <p className="text-xs text-muted-foreground">{t(labels.totalValue)}</p>
             </div>
           </CardContent>
         </Card>
       </div>
       
-      {/* Actions row */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <Button onClick={() => setIsFormOpen(true)} className="rounded-full">
-            {t(labels.addItem)}
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setRoute('prompt-tool')}
-            className="rounded-full"
-          >
-            <Wand2 className="h-4 w-4 mr-1.5" />
-            {t(labels.promptTool)}
-          </Button>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <TabsList>
+            <TabsTrigger value="items" className="gap-1.5">
+              <Package className="h-4 w-4" />
+              {t(labels.items)}
+            </TabsTrigger>
+            <TabsTrigger value="bundles" className="gap-1.5">
+              <Boxes className="h-4 w-4" />
+              {t(labels.bundles)}
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1.5">
+              <Settings className="h-4 w-4" />
+              {t(labels.settings)}
+            </TabsTrigger>
+          </TabsList>
+          
+          {activeTab === 'items' && (
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setIsFormOpen(true)} className="rounded-full">
+                {t(labels.addItem)}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setRoute('prompt-tool')}
+                className="rounded-full"
+              >
+                <Wand2 className="h-4 w-4 mr-1.5" />
+                {t(labels.promptTool)}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                className="rounded-full"
+              >
+                {viewMode === 'grid' ? <List className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setRoute('import')}
+                className="rounded-full"
+              >
+                <FileUp className="h-4 w-4 mr-1.5" />
+                {t(labels.import)}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleExport}
+                className="rounded-full"
+              >
+                <FileDown className="h-4 w-4 mr-1.5" />
+                {t(labels.export)}
+              </Button>
+            </div>
+          )}
         </div>
         
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-            className="rounded-full"
-          >
-            {viewMode === 'grid' ? <List className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setRoute('import')}
-            className="rounded-full"
-          >
-            <FileUp className="h-4 w-4 mr-1.5" />
-            {t(labels.import)}
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleExport}
-            className="rounded-full"
-          >
-            <FileDown className="h-4 w-4 mr-1.5" />
-            {t(labels.export)}
-          </Button>
-        </div>
-      </div>
-      
-      {/* Item list */}
-      <AdminItemList 
-        viewMode={viewMode}
-        onEdit={setEditingItem}
-        onGeneratePost={setPostGeneratorItem}
-      />
+        <TabsContent value="items" className="mt-0">
+          <AdminItemList 
+            viewMode={viewMode}
+            onEdit={setEditingItem}
+            onGeneratePost={setPostGeneratorItem}
+          />
+        </TabsContent>
+        
+        <TabsContent value="bundles" className="mt-0">
+          <BundleManager />
+        </TabsContent>
+        
+        <TabsContent value="settings" className="mt-0">
+          <SettingsPanel />
+        </TabsContent>
+      </Tabs>
       
       {/* Edit/Add form modal */}
       <ItemFormModal
