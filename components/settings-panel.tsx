@@ -92,7 +92,7 @@ export function SettingsPanel() {
     }
   }
 
-  const t = texts[language]
+  const t = texts[language as 'zh' | 'en'] || texts.zh
   const googleMapsUrl = location ? `https://maps.google.com/maps/search/${encodeURIComponent(location)}` : ''
 
   const handleSaveSettings = async () => {

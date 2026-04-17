@@ -67,7 +67,7 @@ export function ImportTool() {
     }
   }
 
-  const t = texts[language]
+  const t = texts[language as 'zh' | 'en'] || texts.zh
 
   // 规范化数据 - 支持多种JSON格式
   const normalizeData = (data: any): any[] => {

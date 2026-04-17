@@ -251,7 +251,7 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
     }
   }
 
-  const t = texts[language]
+  const t = texts[language as 'zh' | 'en'] || texts.zh
 
   return (
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
