@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useApp } from '@/lib/app-context'
+import { Slider } from '@/components/ui/slider'
+import { useAppContext } from '@/lib/app-context'
 import { ImageUpload } from '@/components/image-upload'
 import { toast } from 'sonner'
 import { 
@@ -28,7 +29,6 @@ import {
   CATEGORY_ICONS,
   CONDITION_LABELS,
   STATUS_LABELS,
-  getBundleName,
   type Item,
   type Category,
   type Condition,
@@ -46,35 +46,8 @@ const CONDITIONS: Condition[] = ['like-new', 'good', 'fair', 'well-loved']
 const STATUSES: ItemStatus[] = ['available', 'reserved', 'sold']
 
 export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
-  const { t, lang, addItem, updateItem, data } = useApp()
+  const { addItem, updateItem, bundles, language } = useAppContext()
   const isEditing = !!item
-
-  const labels = {
-    addTitle: { en: 'Add New Item', zh: '添加新物品' },
-    editTitle: { en: 'Edit Item', zh: '编辑物品' },
-    titleEn: { en: 'Title (English)', zh: '标题（英文）' },
-    titleZh: { en: 'Title (Chinese) *', zh: '标题（中文）*' },
-    category: { en: 'Category', zh: '分类' },
-    condition: { en: 'Condition', zh: '成色' },
-    status: { en: 'Status', zh: '状态' },
-    originalPrice: { en: 'Original Price', zh: '原价' },
-    askingPrice: { en: 'Asking Price *', zh: '售价 *' },
-    descriptionEn: { en: 'Description (English)', zh: '描述（英文）' },
-    descriptionZh: { en: 'Description (Chinese)', zh: '描述（中文）' },
-    tags: { en: 'Tags (comma separated)', zh: '标签（逗号分隔）' },
-    images: { en: 'Images', zh: '图片' },
-    bundle: { en: 'Bundle', zh: '套装' },
-    noBundle: { en: 'No bundle', zh: '不加入套装' },
-    featured: { en: 'Featured', zh: '推荐' },
-    featuredDescription: { en: 'Show this item prominently', zh: '在首页显著位置展示此物品' },
-    save: { en: 'Save', zh: '保存' },
-    cancel: { en: 'Cancel', zh: '取消' },
-    basic: { en: 'Basic Info', zh: '基本信息' },
-    details: { en: 'Details', zh: '详细信息' },
-    media: { en: 'Images', zh: '图片' },
-    saved: { en: 'Item saved!', zh: '物品已保存！' },
-    error: { en: 'Failed to save', zh: '保存失败' },
-  }
 
   // Form state
   const [titleEn, setTitleEn] = useState('')
@@ -90,6 +63,13 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
   const [images, setImages] = useState<string[]>([])
   const [bundleId, setBundleId] = useState<string | null>(null)
   const [featured, setFeatured] = useState(false)
+  const [availableFrom, setAvailableFrom] = useState('')
+  const [availableUntil, setAvailableUntil] = useState('')
+  const [sellPriority, setSellPriority] = useState(5)
+  const [allowViewing, setAllowViewing] = useState(true)
+  const [purchaseLink, setPurchaseLink] = useState('')
+  const [notesZh, setNotesZh] = useState('')
+  const [notesEn, setNotesEn] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Reset form when item changes
@@ -108,6 +88,13 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
       setImages(item.images || [])
       setBundleId(item.bundle_id)
       setFeatured(item.featured)
+      setAvailableFrom(item.available_from || '')
+      setAvailableUntil(item.available_until || '')
+      setSellPriority(item.sell_priority || 5)
+      setAllowViewing(item.allow_viewing !== false)
+      setPurchaseLink(item.purchase_link || '')
+      setNotesZh(item.notes_zh || '')
+      setNotesEn(item.notes_en || '')
     } else {
       // Reset to defaults
       setTitleEn('')
@@ -123,6 +110,13 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
       setImages([])
       setBundleId(null)
       setFeatured(false)
+      setAvailableFrom('')
+      setAvailableUntil('')
+      setSellPriority(5)
+      setAllowViewing(true)
+      setPurchaseLink('')
+      setNotesZh('')
+      setNotesEn('')
     }
   }, [item, isOpen])
 
@@ -130,19 +124,19 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
     e.preventDefault()
 
     if (!titleZh.trim()) {
-      toast.error(lang === 'zh' ? '请输入中文标题' : 'Please enter Chinese title')
+      toast.error(language === 'zh' ? '请输入中文标题' : 'Please enter Chinese title')
       return
     }
 
     if (!askingPrice || parseFloat(askingPrice) <= 0) {
-      toast.error(lang === 'zh' ? '请输入有效的售价' : 'Please enter a valid asking price')
+      toast.error(language === 'zh' ? '请输入有效的售价' : 'Please enter a valid asking price')
       return
     }
 
     setSaving(true)
 
     try {
-      const itemData = {
+      const itemData: any = {
         title_zh: titleZh.trim(),
         title_en: titleEn.trim() || null,
         category,
@@ -156,7 +150,13 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
         images,
         bundle_id: bundleId,
         featured,
-        sort_order: item?.sort_order ?? data.items.length,
+        available_from: availableFrom || null,
+        available_until: availableUntil || null,
+        sell_priority: sellPriority,
+        allow_viewing: allowViewing,
+        purchase_link: purchaseLink || null,
+        notes_zh: notesZh || null,
+        notes_en: notesEn || null,
       }
 
       if (isEditing && item) {
@@ -165,37 +165,116 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
         await addItem(itemData)
       }
 
-      toast.success(t(labels.saved))
+      toast.success(language === 'zh' ? '物品已保存' : 'Item saved')
       onClose()
     } catch (error) {
-      toast.error(t(labels.error))
+      toast.error(language === 'zh' ? '保存失败' : 'Failed to save')
     } finally {
       setSaving(false)
     }
   }
 
+  const texts = {
+    en: {
+      addTitle: 'Add New Item',
+      editTitle: 'Edit Item',
+      titleEn: 'Title (English)',
+      titleZh: 'Title (Chinese) *',
+      category: 'Category',
+      condition: 'Condition',
+      status: 'Status',
+      originalPrice: 'Original Price',
+      askingPrice: 'Asking Price *',
+      descriptionEn: 'Description (English)',
+      descriptionZh: 'Description (Chinese)',
+      tags: 'Tags (comma separated)',
+      images: 'Images',
+      bundle: 'Bundle',
+      noBundle: 'No bundle',
+      featured: 'Featured',
+      featuredDescription: 'Show prominently on homepage',
+      availableFrom: 'Available From',
+      availableUntil: 'Available Until',
+      sellPriority: 'Sell Priority',
+      sellPriorityDesc: '1 (最优先), 5 (中等), 10 (最后出)',
+      allowViewing: 'Allow Viewing',
+      allowViewingDesc: 'Buyer can request viewing',
+      purchaseLink: 'Purchase Link (optional)',
+      notesZh: 'Notes (Chinese)',
+      notesEn: 'Notes (English)',
+      save: 'Save',
+      cancel: 'Cancel',
+      basicInfo: 'Basic Info',
+      availability: 'Availability',
+      sellingStrategy: 'Selling Strategy',
+      media: 'Images',
+      saved: 'Item saved!',
+      error: 'Failed to save',
+    },
+    zh: {
+      addTitle: '添加新物品',
+      editTitle: '编辑物品',
+      titleEn: '标题（英文）',
+      titleZh: '标题（中文）*',
+      category: '分类',
+      condition: '成色',
+      status: '状态',
+      originalPrice: '原价',
+      askingPrice: '售价 *',
+      descriptionEn: '描述（英文）',
+      descriptionZh: '描述（中文）',
+      tags: '标签（逗号分隔）',
+      images: '图片',
+      bundle: '套装',
+      noBundle: '不加入套装',
+      featured: '推荐',
+      featuredDescription: '在首页显著位置展示',
+      availableFrom: '从何时可买',
+      availableUntil: '截止日期',
+      sellPriority: '出售优先级',
+      sellPriorityDesc: '1 (最优先), 5 (中等), 10 (最后出)',
+      allowViewing: '允许看货',
+      allowViewingDesc: '买家可以请求看货',
+      purchaseLink: '购买链接（可选）',
+      notesZh: '备注（中文）',
+      notesEn: '备注（英文）',
+      save: '保存',
+      cancel: '取消',
+      basicInfo: '基本信息',
+      availability: '可用期限',
+      sellingStrategy: '销售策略',
+      media: '图片',
+      saved: '物品已保存！',
+      error: '保存失败',
+    }
+  }
+
+  const t = texts[language]
+
   return (
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {t(isEditing ? labels.editTitle : labels.addTitle)}
+            {isEditing ? t.editTitle : t.addTitle}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <Tabs defaultValue="basic">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="basic">{t(labels.basic)}</TabsTrigger>
-              <TabsTrigger value="details">{t(labels.details)}</TabsTrigger>
-              <TabsTrigger value="media">{t(labels.media)}</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="basic">{t.basicInfo}</TabsTrigger>
+              <TabsTrigger value="availability">{t.availability}</TabsTrigger>
+              <TabsTrigger value="strategy">{t.sellingStrategy}</TabsTrigger>
+              <TabsTrigger value="media">{t.media}</TabsTrigger>
             </TabsList>
 
+            {/* Basic Info Tab */}
             <TabsContent value="basic" className="space-y-4 pt-4">
               {/* Title fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>{t(labels.titleZh)}</Label>
+                  <Label>{t.titleZh}</Label>
                   <Input
                     value={titleZh}
                     onChange={(e) => setTitleZh(e.target.value)}
@@ -204,7 +283,7 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t(labels.titleEn)}</Label>
+                  <Label>{t.titleEn}</Label>
                   <Input
                     value={titleEn}
                     onChange={(e) => setTitleEn(e.target.value)}
@@ -216,7 +295,7 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
               {/* Category, Condition, Status */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>{t(labels.category)}</Label>
+                  <Label>{t.category}</Label>
                   <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
                     <SelectTrigger>
                       <SelectValue />
@@ -224,14 +303,14 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
                     <SelectContent>
                       {CATEGORIES.map((cat) => (
                         <SelectItem key={cat} value={cat}>
-                          {CATEGORY_ICONS[cat]} {t(CATEGORY_LABELS[cat])}
+                          {CATEGORY_ICONS[cat]} {language === 'zh' ? CATEGORY_LABELS[cat].zh : CATEGORY_LABELS[cat].en}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t(labels.condition)}</Label>
+                  <Label>{t.condition}</Label>
                   <Select value={condition} onValueChange={(v) => setCondition(v as Condition)}>
                     <SelectTrigger>
                       <SelectValue />
@@ -239,14 +318,14 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
                     <SelectContent>
                       {CONDITIONS.map((cond) => (
                         <SelectItem key={cond} value={cond}>
-                          {t(CONDITION_LABELS[cond])}
+                          {language === 'zh' ? CONDITION_LABELS[cond].zh : CONDITION_LABELS[cond].en}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t(labels.status)}</Label>
+                  <Label>{t.status}</Label>
                   <Select value={status} onValueChange={(v) => setStatus(v as ItemStatus)}>
                     <SelectTrigger>
                       <SelectValue />
@@ -254,7 +333,7 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
                     <SelectContent>
                       {STATUSES.map((s) => (
                         <SelectItem key={s} value={s}>
-                          {t(STATUS_LABELS[s])}
+                          {language === 'zh' ? STATUS_LABELS[s].zh : STATUS_LABELS[s].en}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -265,7 +344,7 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
               {/* Prices */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>{t(labels.originalPrice)} (¥)</Label>
+                  <Label>{t.originalPrice} (¥)</Label>
                   <Input
                     type="number"
                     value={originalPrice}
@@ -276,7 +355,7 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t(labels.askingPrice)} (¥)</Label>
+                  <Label>{t.askingPrice} (¥)</Label>
                   <Input
                     type="number"
                     value={askingPrice}
@@ -290,9 +369,9 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
               </div>
 
               {/* Bundle selection */}
-              {data.bundles.length > 0 && (
+              {bundles && bundles.length > 0 && (
                 <div className="space-y-2">
-                  <Label>{t(labels.bundle)}</Label>
+                  <Label>{t.bundle}</Label>
                   <Select 
                     value={bundleId || 'none'} 
                     onValueChange={(v) => setBundleId(v === 'none' ? null : v)}
@@ -301,10 +380,10 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">{t(labels.noBundle)}</SelectItem>
-                      {data.bundles.map((bundle) => (
+                      <SelectItem value="none">{t.noBundle}</SelectItem>
+                      {bundles.map((bundle) => (
                         <SelectItem key={bundle.id} value={bundle.id}>
-                          {getBundleName(bundle, lang)} ({bundle.discount_percent}% off)
+                          {language === 'zh' ? bundle.name_zh : (bundle.name_en || bundle.name_zh)} ({bundle.discount_percent}% off)
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -315,40 +394,38 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
               {/* Featured toggle */}
               <div className="flex items-center justify-between p-3 rounded-lg border">
                 <div>
-                  <Label>{t(labels.featured)}</Label>
-                  <p className="text-sm text-muted-foreground">{t(labels.featuredDescription)}</p>
+                  <Label>{t.featured}</Label>
+                  <p className="text-sm text-muted-foreground">{t.featuredDescription}</p>
                 </div>
                 <Switch
                   checked={featured}
                   onCheckedChange={setFeatured}
                 />
               </div>
-            </TabsContent>
 
-            <TabsContent value="details" className="space-y-4 pt-4">
               {/* Descriptions */}
               <div className="space-y-2">
-                <Label>{t(labels.descriptionZh)}</Label>
+                <Label>{t.descriptionZh}</Label>
                 <Textarea
                   value={descriptionZh}
                   onChange={(e) => setDescriptionZh(e.target.value)}
                   placeholder="用中文描述物品..."
-                  rows={3}
+                  rows={2}
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t(labels.descriptionEn)}</Label>
+                <Label>{t.descriptionEn}</Label>
                 <Textarea
                   value={descriptionEn}
                   onChange={(e) => setDescriptionEn(e.target.value)}
                   placeholder="Describe the item in English..."
-                  rows={3}
+                  rows={2}
                 />
               </div>
 
               {/* Tags */}
               <div className="space-y-2">
-                <Label>{t(labels.tags)}</Label>
+                <Label>{t.tags}</Label>
                 <Input
                   value={tags}
                   onChange={(e) => setTags(e.target.value)}
@@ -357,15 +434,120 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
               </div>
             </TabsContent>
 
-            <TabsContent value="media" className="space-y-4 pt-4">
-              {/* Images */}
+            {/* Availability Tab */}
+            <TabsContent value="availability" className="space-y-4 pt-4">
               <div className="space-y-2">
-                <Label>{t(labels.images)}</Label>
-                <ImageUpload
-                  images={images}
-                  onChange={setImages}
-                  maxImages={10}
+                <Label>{t.availableFrom}</Label>
+                <Input
+                  type="date"
+                  value={availableFrom}
+                  onChange={(e) => setAvailableFrom(e.target.value)}
                 />
+                <p className="text-xs text-gray-500">{language === 'zh' ? '物品何时可以购买' : 'When the item becomes available for purchase'}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t.availableUntil}</Label>
+                <Input
+                  type="date"
+                  value={availableUntil}
+                  onChange={(e) => setAvailableUntil(e.target.value)}
+                />
+                <p className="text-xs text-gray-500">{language === 'zh' ? '物品截止销售日期' : 'Latest date item is available for purchase'}</p>
+              </div>
+
+              {/* Allow Viewing */}
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div>
+                  <Label>{t.allowViewing}</Label>
+                  <p className="text-sm text-muted-foreground">{t.allowViewingDesc}</p>
+                </div>
+                <Switch
+                  checked={allowViewing}
+                  onCheckedChange={setAllowViewing}
+                />
+              </div>
+            </TabsContent>
+
+            {/* Selling Strategy Tab */}
+            <TabsContent value="strategy" className="space-y-4 pt-4">
+              {/* Sell Priority */}
+              <div className="space-y-3">
+                <div>
+                  <Label>{t.sellPriority}</Label>
+                  <p className="text-xs text-gray-500 mb-2">{t.sellPriorityDesc}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Slider
+                    value={[sellPriority]}
+                    onValueChange={(value) => setSellPriority(value[0])}
+                    min={1}
+                    max={10}
+                    step={1}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-semibold w-8 text-center">{sellPriority}</span>
+                </div>
+              </div>
+
+              {/* Purchase Link */}
+              <div className="space-y-2">
+                <Label>{t.purchaseLink}</Label>
+                <Input
+                  value={purchaseLink}
+                  onChange={(e) => setPurchaseLink(e.target.value)}
+                  placeholder="https://..."
+                />
+                <p className="text-xs text-gray-500">{language === 'zh' ? '如果在其他平台也在出售，可以添加链接' : 'Link if also selling on other platforms'}</p>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <Label>{t.notesZh}</Label>
+                <Textarea
+                  value={notesZh}
+                  onChange={(e) => setNotesZh(e.target.value)}
+                  placeholder={language === 'zh' ? '添加任何附加信息或特殊说明...' : 'Add any additional information...'}
+                  rows={2}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t.notesEn}</Label>
+                <Textarea
+                  value={notesEn}
+                  onChange={(e) => setNotesEn(e.target.value)}
+                  placeholder="Add any additional information..."
+                  rows={2}
+                />
+              </div>
+            </TabsContent>
+
+            {/* Media Tab */}
+            <TabsContent value="media" className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>{t.images}</Label>
+                <ImageUpload
+                  onUpload={(url) => {
+                    setImages([...images, url])
+                  }}
+                  isLoading={false}
+                />
+                {images.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2 mt-4">
+                    {images.map((img, idx) => (
+                      <div key={idx} className="relative group">
+                        <img src={img} alt={`Item ${idx}`} className="w-full aspect-square object-cover rounded border" />
+                        <button
+                          type="button"
+                          onClick={() => setImages(images.filter((_, i) => i !== idx))}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>
@@ -373,10 +555,10 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
           {/* Form actions */}
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
-              {t(labels.cancel)}
+              {t.cancel}
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? (lang === 'zh' ? '保存中...' : 'Saving...') : t(labels.save)}
+              {saving ? '...' : t.save}
             </Button>
           </div>
         </form>

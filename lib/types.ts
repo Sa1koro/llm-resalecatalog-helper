@@ -6,7 +6,7 @@ export type Condition = 'like-new' | 'good' | 'fair' | 'well-loved'
 
 export type ItemStatus = 'available' | 'reserved' | 'sold'
 
-export type ContactPlatform = 'wechat' | 'xiaohongshu' | 'phone' | 'facebook' | 'discord' | 'qq'
+export type ContactPlatform = 'wechat' | 'xiaohongshu' | 'phone' | 'facebook' | 'discord' | 'qq' | 'custom'
 
 export interface BilingualText {
   en: string
@@ -17,7 +17,9 @@ export interface ContactMethod {
   id: string
   platform: ContactPlatform
   value: string
+  link?: string
   label?: string
+  qr_code_url?: string
   enabled: boolean
   sort_order: number
 }
@@ -46,6 +48,13 @@ export interface Item {
   tags: string[]
   featured: boolean
   sort_order: number
+  available_from: string | null
+  available_until: string | null
+  sell_priority: number
+  allow_viewing: boolean
+  purchase_link: string | null
+  notes_zh: string | null
+  notes_en: string | null
   created_at?: string
   updated_at?: string
 }
@@ -144,6 +153,10 @@ export const CONTACT_PLATFORM_INFO: Record<ContactPlatform, { label: BilingualTe
     icon: 'MessageCircle',
     copyable: true
   },
+  custom: {
+    label: { en: 'Custom', zh: '自定义' },
+    icon: 'Link'
+  }
 }
 
 // Helper function to get bilingual text from item
