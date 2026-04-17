@@ -51,6 +51,7 @@ import {
   getItemTitle,
   getPriorityLabel,
   getPriorityColor,
+  formatPrice,
   type Item,
   type ItemStatus,
 } from '@/lib/types'
@@ -64,6 +65,7 @@ interface AdminItemListProps {
 
 export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemListProps) {
   const { data, t, lang, deleteItem, duplicateItem, updateItemStatus, updateItem, reorderItems } = useApp()
+  const currency = data.settings.currency || 'CAD'
   const [deleteConfirm, setDeleteConfirm] = useState<Item | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -268,7 +270,7 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
                 </div>
                 <CardContent className="p-3">
                   <h4 className="font-medium line-clamp-1 mb-1">{getItemTitle(item, lang)}</h4>
-                  <p className="text-lg font-bold text-primary mb-2">¥{item.asking_price}</p>
+                  <p className="text-lg font-bold text-primary mb-2">{formatPrice(item.asking_price, currency)}</p>
                   <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                     <Badge variant="outline">{t(CONDITION_LABELS[item.condition])}</Badge>
                     <Badge
@@ -415,7 +417,7 @@ export function AdminItemList({ viewMode, onEdit, onGeneratePost }: AdminItemLis
                     <Badge variant="outline">{t(CONDITION_LABELS[item.condition])}</Badge>
                   </TableCell>
                   <TableCell className="font-bold text-primary">
-                    ¥{item.asking_price}
+                    {formatPrice(item.asking_price, currency)}
                   </TableCell>
                   <TableCell>
                     <Badge

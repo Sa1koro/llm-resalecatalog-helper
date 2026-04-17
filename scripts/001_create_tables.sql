@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS settings (
   location TEXT,
   moving_date DATE,
   admin_password TEXT NOT NULL DEFAULT 'resale2026',
+  currency TEXT NOT NULL DEFAULT 'CAD', -- CAD, USD, CNY
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -78,8 +79,8 @@ ALTER TABLE items DISABLE ROW LEVEL SECURITY;
 ALTER TABLE bundles DISABLE ROW LEVEL SECURITY;
 
 -- Insert default settings
-INSERT INTO settings (seller_name, location, moving_date, admin_password)
-VALUES ('ResaleBox', '', NOW() + INTERVAL '30 days', 'resale2026')
+INSERT INTO settings (seller_name, location, moving_date, admin_password, currency)
+VALUES ('ResaleBox', '', NOW() + INTERVAL '30 days', 'resale2026', 'CAD')
 ON CONFLICT DO NOTHING;
 
 -- Insert default contact methods

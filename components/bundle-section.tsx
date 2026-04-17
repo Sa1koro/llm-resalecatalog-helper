@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useApp } from '@/lib/app-context'
-import { CATEGORY_ICONS, getBundleName, getBundleDescription, getItemTitle, type Item } from '@/lib/types'
+import { CATEGORY_ICONS, getBundleName, getBundleDescription, getItemTitle, formatPrice, type Item } from '@/lib/types'
 
 interface BundleSectionProps {
   onItemClick: (item: Item) => void
@@ -13,6 +13,7 @@ interface BundleSectionProps {
 
 export function BundleSection({ onItemClick }: BundleSectionProps) {
   const { data, lang, t, getItemsInBundle, calculateBundleSavings, calculateBundlePrice } = useApp()
+  const currency = data.settings.currency || 'CAD'
 
   const sectionTitle = { en: 'Bundle Deals', zh: '打包优惠' }
   const saveLabel = { en: 'Save', zh: '省' }
@@ -49,7 +50,7 @@ export function BundleSection({ onItemClick }: BundleSectionProps) {
                   </CardTitle>
                   <Badge className="bg-primary text-primary-foreground relative overflow-hidden">
                     <span className="relative z-10">
-                      {t(saveLabel)} ¥{savings.toFixed(0)}
+                      {t(saveLabel)} {formatPrice(Number(savings.toFixed(0)), currency)}
                     </span>
                     <span className="absolute inset-0 animate-shimmer" />
                   </Badge>
@@ -92,13 +93,13 @@ export function BundleSection({ onItemClick }: BundleSectionProps) {
                   <div>
                     <p className="text-xs text-muted-foreground">{t(individualPriceLabel)}</p>
                     <p className="text-sm line-through text-muted-foreground">
-                      ¥{individualTotal}
+                      {formatPrice(individualTotal, currency)}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">{t(bundlePriceLabel)}</p>
                     <p className="text-xl font-bold text-primary">
-                      ¥{bundlePrice.toFixed(0)}
+                      {formatPrice(Number(bundlePrice.toFixed(0)), currency)}
                     </p>
                   </div>
                 </div>

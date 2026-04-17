@@ -41,6 +41,7 @@ import {
   getBundleName,
   getPriorityLabel,
   getPriorityColor,
+  formatPrice,
   type Item
 } from '@/lib/types'
 import { Flame, Clock } from 'lucide-react'
@@ -53,6 +54,7 @@ interface ItemDetailModalProps {
 
 export function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
   const { data, t, lang, getBundleById, getItemsInBundle, calculateBundlePrice, calculateBundleSavings } = useApp()
+  const currency = data.settings.currency || 'CAD'
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [copiedLink, setCopiedLink] = useState(false)
 
@@ -115,13 +117,13 @@ export function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
 
   const generateShareText = () => {
     const title = getItemTitle(item, lang)
-    const price = `¥${item.asking_price}`
+    const price = formatPrice(item.asking_price, currency)
     const condition = t(CONDITION_LABELS[item.condition])
     const description = getItemDescription(item, lang)
     
     if (lang === 'zh') {
       return `【${title}】
-售价: ${price}${item.original_price ? ` (原价 ¥${item.original_price})` : ''}
+售价: ${price}${item.original_price ? ` (原价 ${formatPrice(item.original_price, currency)})` : ''}
 成色: ${condition}
 ${description ? `\n${description}\n` : ''}
 ${item.purchase_link ? `原始链接: ${item.purchase_link}\n` : ''}
@@ -129,7 +131,7 @@ ${item.purchase_link ? `原始链接: ${item.purchase_link}\n` : ''}
     }
     
     return `【${title}】
-Price: ${price}${item.original_price ? ` (was ¥${item.original_price})` : ''}
+Price: ${price}${item.original_price ? ` (was ${formatPrice(item.original_price, currency)})` : ''}
 Condition: ${condition}
 ${description ? `\n${description}\n` : ''}
 ${item.purchase_link ? `Original listing: ${item.purchase_link}\n` : ''}
@@ -252,12 +254,12 @@ Link: ${getItemUrl()}`
           {/* Price block */}
           <div className="flex items-baseline gap-3 mb-4">
             <span className="text-3xl font-bold text-primary">
-              ¥{item.asking_price}
+              {formatPrice(item.asking_price, currency)}
             </span>
             {item.original_price && (
               <>
                 <span className="text-lg text-muted-foreground line-through">
-                  ¥{item.original_price}
+                  {formatPrice(item.original_price, currency)}
                 </span>
                 {discountPercent > 0 && (
                   <Badge className="bg-primary text-primary-foreground">
@@ -367,7 +369,7 @@ Link: ${getItemUrl()}`
                       <div className="flex items-start justify-between mb-2">
                         <h4 className="font-medium">{getBundleName(bundle, lang)}</h4>
                         <Badge className="bg-primary text-primary-foreground">
-                          {t(labels.save)} ¥{savings.toFixed(0)}
+                          {t(labels.save)} {formatPrice(Number(savings.toFixed(0)), currency)}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 mb-2">
@@ -382,10 +384,10 @@ Link: ${getItemUrl()}`
                       </div>
                       <div className="flex items-baseline gap-2">
                         <span className="text-lg font-bold text-primary">
-                          ¥{bundlePrice.toFixed(0)}
+                          {formatPrice(Number(bundlePrice.toFixed(0)), currency)}
                         </span>
                         <span className="text-sm text-muted-foreground line-through">
-                          ¥{totalIndividual}
+                          {formatPrice(totalIndividual, currency)}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           ({bundle.discount_percent}% off)

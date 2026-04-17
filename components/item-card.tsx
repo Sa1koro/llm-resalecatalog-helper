@@ -13,6 +13,7 @@ import {
   getItemTitle,
   getPriorityLabel,
   getPriorityColor,
+  formatPrice,
   type Item
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -23,7 +24,8 @@ interface ItemCardProps {
 }
 
 export function ItemCard({ item, onClick }: ItemCardProps) {
-  const { t, lang, getBundleById } = useApp()
+  const { data, t, lang, getBundleById } = useApp()
+  const currency = data.settings.currency || 'CAD'
   
   const bundle = item.bundle_id ? getBundleById(item.bundle_id) : null
   const hasBundle = bundle?.enabled
@@ -132,12 +134,12 @@ export function ItemCard({ item, onClick }: ItemCardProps) {
         {/* Price row */}
         <div className="flex items-baseline gap-2 mb-3">
           <span className="text-lg font-bold text-primary">
-            ¥{item.asking_price}
+            {formatPrice(item.asking_price, currency)}
           </span>
           {item.original_price && (
             <>
               <span className="text-sm text-muted-foreground line-through">
-                ¥{item.original_price}
+                {formatPrice(item.original_price, currency)}
               </span>
               {discountPercent > 0 && (
                 <Badge variant="destructive" className="bg-primary text-primary-foreground text-xs">

@@ -26,6 +26,8 @@ import {
   getItemTitle,
   getItemDescription,
   CONTACT_PLATFORM_INFO,
+  getCurrencySymbol,
+  type CurrencyCode,
   type Item,
   type ContactMethod,
 } from '@/lib/types'
@@ -113,6 +115,8 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
     const purchaseLink = item.purchase_link || ''
 
     const location = data.settings.location || ''
+    const currency = (data.settings.currency || 'CAD') as CurrencyCode
+    const currencySymbol = getCurrencySymbol(currency)
     const contactsZh = getPrimaryContactLine(data.contactMethods, 'zh')
     const contactsEn = getPrimaryContactLine(data.contactMethods, 'en')
 
@@ -120,11 +124,11 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
       ? Math.round(((item.original_price - item.asking_price) / item.original_price) * 100)
       : 0
     const originalPriceLineZh = item.original_price
-      ? `💰 特价出售 CAD $${item.asking_price}（原价 $${item.original_price}，省${discountPercent}%！）`
-      : `💰 售价 CAD $${item.asking_price}`
+      ? `💰 特价出售 ${currency} ${currencySymbol}${item.asking_price}（原价 ${currencySymbol}${item.original_price}，省${discountPercent}%！）`
+      : `💰 售价 ${currency} ${currencySymbol}${item.asking_price}`
     const originalPriceLineEn = item.original_price
-      ? `💵 Price: CAD $${item.asking_price} (Originally $${item.original_price} - ${discountPercent}% OFF!)`
-      : `💵 Price: CAD $${item.asking_price}`
+      ? `💵 Price: ${currency} ${currencySymbol}${item.asking_price} (Originally ${currencySymbol}${item.original_price} - ${discountPercent}% OFF!)`
+      : `💵 Price: ${currency} ${currencySymbol}${item.asking_price}`
 
     // Xiaohongshu post (Chinese)
     const xhsPost = [
@@ -183,7 +187,7 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
       : ''
 
     const dcPost = [
-      `**${titleEn}** — CAD $${item.asking_price}`,
+      `**${titleEn}** — ${currency} ${currencySymbol}${item.asking_price}`,
       '',
       shortDesc,
       '',
@@ -219,6 +223,8 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
     const title = getItemTitle(item, lang)
     const description = getItemDescription(item, lang)
     const location = data.settings.location || ''
+    const currency = (data.settings.currency || 'CAD') as CurrencyCode
+    const currencySymbol = getCurrencySymbol(currency)
 
     ctx.fillStyle = '#faf9f7'
     ctx.fillRect(0, 0, width, height)
@@ -235,12 +241,12 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
 
     ctx.fillStyle = '#e8927c'
     ctx.font = 'bold 64px "DM Sans", sans-serif'
-    ctx.fillText(`$${item.asking_price}`, padding, 180)
+    ctx.fillText(`${currencySymbol}${item.asking_price}`, padding, 180)
 
     if (item.original_price) {
       ctx.fillStyle = '#8a8480'
       ctx.font = '32px "DM Sans", sans-serif'
-      ctx.fillText(`Original: $${item.original_price}`, padding + 200, 175)
+      ctx.fillText(`Original: ${currencySymbol}${item.original_price}`, padding + 200, 175)
     }
 
     if (description) {

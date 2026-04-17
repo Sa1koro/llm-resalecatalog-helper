@@ -25,7 +25,8 @@ type PromptType = 'visual' | 'text'
 const CONDITIONS: Condition[] = ['like-new', 'good', 'fair', 'well-loved']
 
 export function PromptTool() {
-  const { setRoute, t, lang } = useApp()
+  const { data, setRoute, t, lang } = useApp()
+  const currency = data.settings.currency || 'CAD'
   
   const [itemName, setItemName] = useState('')
   const [condition, setCondition] = useState<Condition>('good')
@@ -48,7 +49,7 @@ export function PromptTool() {
     itemName: { en: 'Item name (optional)', zh: '物品名称（可选）' },
     itemNamePlaceholder: { en: 'e.g., IKEA desk lamp', zh: '例如：宜家台灯' },
     condition: { en: 'Condition', zh: '成色' },
-    askingPrice: { en: 'Asking price (CAD)', zh: '售价（加元）' },
+    askingPrice: { en: `Asking price (${currency})`, zh: `售价（${currency}）` },
     availableFrom: { en: 'Available from (optional)', zh: '可取货开始日期（可选）' },
     availableUntil: { en: 'Available until (optional)', zh: '可取货截止日期（可选）' },
     purchaseLink: { en: 'Purchase link (optional)', zh: '商品链接（可选）' },
@@ -78,7 +79,7 @@ export function PromptTool() {
     const itemInfo = `
 ${itemName ? `物品名称提示 / Item name hint: ${itemName}` : ''}
 成色 / Condition: ${CONDITION_LABELS[condition].en} / ${CONDITION_LABELS[condition].zh}
-${askingPrice ? `售价 / Asking price: CAD $${askingPrice}` : ''}
+${askingPrice ? `售价 / Asking price: ${currency} ${askingPrice}` : ''}
 ${availableFrom ? `可取货开始日期 / Available from: ${availableFrom}` : ''}
 ${availableUntil ? `可取货截止日期 / Available until: ${availableUntil}` : ''}
 ${purchaseLink ? `商品链接 / Purchase link: ${purchaseLink}` : ''}

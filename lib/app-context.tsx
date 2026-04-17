@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS: Settings = {
   location: null,
   moving_date: null,
   admin_password: 'resale2026',
+  currency: 'CAD',
 }
 
 const DEFAULT_DATA: AppData = {
@@ -118,7 +119,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       setData({
-        settings: settings || DEFAULT_SETTINGS,
+        settings: settings ? { ...DEFAULT_SETTINGS, ...settings } : DEFAULT_SETTINGS,
         contactMethods: contactsRes.data || [],
         items: itemsRes.data || [],
         bundles: bundlesRes.data || [],

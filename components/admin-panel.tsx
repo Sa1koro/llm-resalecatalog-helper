@@ -12,10 +12,11 @@ import { ItemFormModal } from './item-form-modal'
 import { PostGeneratorModal } from './post-generator-modal'
 import { SettingsPanel } from './settings-panel'
 import { BundleManager } from './bundle-manager'
-import type { Item } from '@/lib/types'
+import { formatPrice, type Item } from '@/lib/types'
 
 export function AdminPanel() {
   const { isAuthenticated, authenticate, setRoute, data, t, lang, loading } = useApp()
+  const currency = data.settings.currency || 'CAD'
   const [password, setPassword] = useState('')
   const [error, setError] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
@@ -187,7 +188,7 @@ export function AdminPanel() {
               <DollarSign className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">¥{stats.totalValue}</p>
+              <p className="text-2xl font-bold">{formatPrice(stats.totalValue, currency)}</p>
               <p className="text-xs text-muted-foreground">{t(labels.totalValue)}</p>
             </div>
           </CardContent>

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Trash2, Edit2, Plus, Copy, Check, MapPin, ExternalLink } from 'lucide-react'
-import { ContactPlatform, CONTACT_PLATFORM_INFO } from '@/lib/types'
+import { ContactPlatform, CONTACT_PLATFORM_INFO, CURRENCY_LABELS, type CurrencyCode } from '@/lib/types'
 import { ImageUpload } from '@/components/image-upload'
 import { toast } from 'sonner'
 
@@ -24,6 +24,7 @@ export function SettingsPanel() {
   const [sellerName, setSellerName] = useState(settings?.seller_name || '')
   const [location, setLocation] = useState(settings?.location || '')
   const [movingDate, setMovingDate] = useState(settings?.moving_date || '')
+  const [currency, setCurrency] = useState<CurrencyCode>((settings?.currency as CurrencyCode) || 'CAD')
   const [adminPassword, setAdminPassword] = useState(settings?.admin_password || '')
   const [saving, setSaving] = useState(false)
   const [editingContactId, setEditingContactId] = useState<string | null>(null)
@@ -37,6 +38,7 @@ export function SettingsPanel() {
       sellerName: 'Seller Name',
       location: 'Location',
       movingDate: 'Moving Date',
+      currency: 'Currency',
       adminPassword: 'Admin Password',
       openMap: 'Open in Google Maps',
       save: 'Save',
@@ -67,6 +69,7 @@ export function SettingsPanel() {
       sellerName: '卖家名称',
       location: '位置',
       movingDate: '搬家日期',
+      currency: '货币',
       adminPassword: '管理员密码',
       openMap: '在Google地图打开',
       save: '保存',
@@ -104,6 +107,7 @@ export function SettingsPanel() {
         seller_name: sellerName,
         location,
         moving_date: movingDate,
+        currency,
         admin_password: adminPassword,
       })
       toast.success(t.saved)
@@ -179,6 +183,23 @@ export function SettingsPanel() {
                   value={movingDate}
                   onChange={(e) => setMovingDate(e.target.value)}
                 />
+              </div>
+
+              {/* Currency */}
+              <div className="space-y-2">
+                <Label htmlFor="currency">{t.currency}</Label>
+                <Select value={currency} onValueChange={(v) => setCurrency(v as CurrencyCode)}>
+                  <SelectTrigger id="currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(CURRENCY_LABELS) as CurrencyCode[]).map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {language === 'zh' ? CURRENCY_LABELS[code].zh : CURRENCY_LABELS[code].en}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Admin Password */}

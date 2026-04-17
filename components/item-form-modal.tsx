@@ -48,6 +48,7 @@ const STATUSES: ItemStatus[] = ['available', 'reserved', 'sold']
 export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
   const { addItem, updateItem, data, lang } = useApp()
   const bundles = data.bundles
+  const currency = data.settings.currency || 'CAD'
   const language = lang || 'zh'
   const isEditing = !!item
 
@@ -346,7 +347,7 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
               {/* Prices */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>{t.originalPrice} (¥)</Label>
+                  <Label>{t.originalPrice} ({currency})</Label>
                   <Input
                     type="number"
                     value={originalPrice}
@@ -357,7 +358,7 @@ export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t.askingPrice} (¥)</Label>
+                  <Label>{t.askingPrice} ({currency})</Label>
                   <Input
                     type="number"
                     value={askingPrice}

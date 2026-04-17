@@ -1,4 +1,5 @@
 export type Language = 'en' | 'zh'
+export type CurrencyCode = 'CAD' | 'USD' | 'CNY'
 
 export type Category = 'furniture' | 'electronics' | 'clothing' | 'kitchen' | 'sports' | 'books' | 'other'
 
@@ -30,6 +31,7 @@ export interface Settings {
   location: string | null
   moving_date: string | null
   admin_password: string
+  currency?: CurrencyCode | null
 }
 
 export interface Item {
@@ -193,4 +195,24 @@ export function getBundleName(bundle: Bundle, lang: Language): string {
 export function getBundleDescription(bundle: Bundle, lang: Language): string {
   if (lang === 'zh') return bundle.description_zh || ''
   return bundle.description_en || bundle.description_zh || ''
+}
+
+export const CURRENCY_LABELS: Record<CurrencyCode, BilingualText> = {
+  CAD: { en: 'Canadian Dollar (CAD)', zh: '加元 (CAD)' },
+  USD: { en: 'US Dollar (USD)', zh: '美元 (USD)' },
+  CNY: { en: 'Chinese Yuan (CNY)', zh: '人民币 (CNY)' },
+}
+
+export function getCurrencySymbol(currency?: CurrencyCode | null): string {
+  switch (currency || 'CAD') {
+    case 'USD': return '$'
+    case 'CNY': return '¥'
+    case 'CAD':
+    default:
+      return '$'
+  }
+}
+
+export function formatPrice(value: number, currency?: CurrencyCode | null): string {
+  return `${getCurrencySymbol(currency)}${value}`
 }

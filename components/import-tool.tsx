@@ -11,12 +11,14 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { AlertCircle, CheckCircle, Upload } from 'lucide-react'
 import { toast } from 'sonner'
+import { formatPrice } from '@/lib/types'
 
 type ImportMode = 'replace' | 'add' | 'update'
 
 export function ImportTool() {
   const { addItem, updateItem, deleteItem, data, lang, refreshData } = useApp()
   const language = lang || 'zh'
+  const currency = data.settings.currency || 'CAD'
   const [jsonInput, setJsonInput] = useState('')
   const [importMode, setImportMode] = useState<ImportMode>('add')
   const [validationResult, setValidationResult] = useState<any>(null)
@@ -398,7 +400,7 @@ export function ImportTool() {
                   {validationResult.items.slice(0, 3).map((item: any, i: number) => (
                     <div key={i} className="mb-2 pb-2 border-b last:border-b-0">
                       <p className="truncate">
-                        {item.title_zh} - ¥{item.asking_price} ({item.condition})
+                        {item.title_zh} - {formatPrice(item.asking_price, currency)} ({item.condition})
                       </p>
                     </div>
                   ))}

@@ -39,7 +39,7 @@ import {
   Tag,
   Image as ImageIcon
 } from 'lucide-react'
-import { getBundleName, getItemTitle, type Bundle } from '@/lib/types'
+import { getBundleName, getItemTitle, formatPrice, type Bundle } from '@/lib/types'
 import { toast } from 'sonner'
 
 interface BundleFormData {
@@ -63,6 +63,7 @@ const DEFAULT_FORM: BundleFormData = {
 export function BundleManager() {
   const { data, lang, addBundle, updateBundle, deleteBundle, updateItem, getItemsInBundle, calculateBundlePrice, calculateBundleSavings } = useApp()
   const { bundles, items } = data
+  const currency = data.settings.currency || 'CAD'
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingBundle, setEditingBundle] = useState<Bundle | null>(null)
@@ -255,10 +256,13 @@ export function BundleManager() {
                           <>
                             <span className="text-muted-foreground">|</span>
                             <span className="font-medium">
-                              ¥{bundlePrice.toFixed(0)}
+                              {formatPrice(Number(bundlePrice.toFixed(0)), currency)}
                             </span>
                             <span className="text-green-600">
-                              {lang === 'zh' ? `省 ¥${savings.toFixed(0)}` : `Save ¥${savings.toFixed(0)}`}
+                              {lang === 'zh'
+                                ? `省 ${formatPrice(Number(savings.toFixed(0)), currency)}`
+                                : `Save ${formatPrice(Number(savings.toFixed(0)), currency)}`
+                              }
                             </span>
                           </>
                         )}
@@ -438,7 +442,7 @@ export function BundleManager() {
                           {getItemTitle(item, lang)}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          ¥{item.asking_price}
+                          {formatPrice(item.asking_price, currency)}
                         </div>
                       </div>
                     </label>
