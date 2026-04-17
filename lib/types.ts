@@ -7,7 +7,7 @@ export type Condition = 'like-new' | 'good' | 'fair' | 'well-loved'
 
 export type ItemStatus = 'available' | 'reserved' | 'sold'
 
-export type ContactPlatform = 'wechat' | 'xiaohongshu' | 'phone' | 'facebook' | 'discord' | 'qq' | 'custom'
+export type ContactPlatform = 'wechat' | 'xiaohongshu' | 'phone' | 'sms' | 'facebook' | 'discord' | 'qq' | 'custom'
 
 export interface BilingualText {
   en: string
@@ -153,9 +153,14 @@ export const CONTACT_PLATFORM_INFO: Record<ContactPlatform, { label: BilingualTe
     urlPrefix: 'https://www.xiaohongshu.com/user/profile/'
   },
   phone: { 
-    label: { en: 'Phone/SMS', zh: '电话/短信' }, 
+    label: { en: 'Phone', zh: '电话' }, 
     icon: 'Phone',
     urlPrefix: 'tel:'
+  },
+  sms: {
+    label: { en: 'SMS', zh: '短信' },
+    icon: 'MessageSquare',
+    urlPrefix: 'sms:'
   },
   facebook: { 
     label: { en: 'Facebook', zh: 'Facebook' }, 

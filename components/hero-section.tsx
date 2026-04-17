@@ -29,6 +29,8 @@ function ContactIcon({ platform }: { platform: ContactPlatform }) {
       return <BookOpen className="h-4 w-4" />
     case 'phone':
       return <Phone className="h-4 w-4" />
+    case 'sms':
+      return <MessageCircle className="h-4 w-4" />
     case 'facebook':
       return (
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
@@ -57,8 +59,9 @@ function getContactUrl(contact: { platform: ContactPlatform; value: string; link
   if (info.urlPrefix) {
     // If value is already a full URL, use it directly
     if (value.startsWith('http')) return value
-    // For phone, format properly
+    // For phone/sms, normalize number
     if (platform === 'phone') return `tel:${value.replace(/\D/g, '')}`
+    if (platform === 'sms') return `sms:${value.replace(/\D/g, '')}`
     return `${info.urlPrefix}${value}`
   }
   
@@ -85,8 +88,22 @@ export function HeroSection() {
 
   const enabledContacts = contactMethods.filter(c => c.enabled)
 
-  const handleContactClick = (contact: typeof contactMethods[0]) => {
+  const handleContactClick = async (contact: typeof contactMethods[0]) => {
     const url = getContactUrl(contact)
+
+    if (contact.platform === 'phone' || contact.platform === 'sms') {
+      // iOS webviews can block deep links; copy first so user can still paste manually.
+      try {
+        await navigator.clipboard.writeText(contact.value)
+        toast.success(lang === 'zh' ? `已复制: ${contact.value}` : `Copied: ${contact.value}`)
+      } catch {
+        toast.error(lang === 'zh' ? '复制失败，请手动复制号码' : 'Copy failed, please copy the number manually')
+      }
+      if (url) {
+        window.location.href = url
+      }
+      return
+    }
     
     if (url) {
       window.open(url, '_blank', 'noopener,noreferrer')

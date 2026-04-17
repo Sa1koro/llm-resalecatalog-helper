@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS settings (
 -- Contact methods table
 CREATE TABLE IF NOT EXISTS contact_methods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  platform TEXT NOT NULL, -- wechat, xiaohongshu, phone, facebook, discord, qq
+  platform TEXT NOT NULL, -- wechat, xiaohongshu, phone, sms, facebook, discord, qq, custom
   value TEXT NOT NULL,
   label TEXT, -- display label like "微信号"
   enabled BOOLEAN DEFAULT true,
@@ -87,8 +87,9 @@ ON CONFLICT DO NOTHING;
 INSERT INTO contact_methods (platform, value, label, enabled, sort_order) VALUES
 ('wechat', '', '微信', false, 1),
 ('xiaohongshu', '', '小红书', false, 2),
-('phone', '', '电话/短信', false, 3),
-('qq', '', 'QQ', false, 4),
-('facebook', '', 'Facebook', false, 5),
-('discord', '', 'Discord', false, 6)
+('phone', '', '电话', false, 3),
+('sms', '', '短信', false, 4),
+('qq', '', 'QQ', false, 5),
+('facebook', '', 'Facebook', false, 6),
+('discord', '', 'Discord', false, 7)
 ON CONFLICT DO NOTHING;

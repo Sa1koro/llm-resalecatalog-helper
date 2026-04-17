@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useApp } from '@/lib/app-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, Edit2, Plus, Copy, Check, MapPin, ExternalLink } from 'lucide-react'
+import { Trash2, Edit2, Plus, Copy, Check, MapPin, ExternalLink, GripVertical } from 'lucide-react'
 import { ContactPlatform, CONTACT_PLATFORM_INFO, CURRENCY_LABELS, type CurrencyCode } from '@/lib/types'
 import { ImageUpload } from '@/components/image-upload'
 import { toast } from 'sonner'
@@ -29,6 +29,8 @@ export function SettingsPanel() {
   const [saving, setSaving] = useState(false)
   const [editingContactId, setEditingContactId] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [draggingContactId, setDraggingContactId] = useState<string | null>(null)
+  const [dragOverContactId, setDragOverContactId] = useState<string | null>(null)
 
   const texts = {
     en: {
@@ -97,6 +99,10 @@ export function SettingsPanel() {
 
   const t = texts[language]
   const googleMapsUrl = location ? `https://maps.google.com/maps/search/${encodeURIComponent(location)}` : ''
+  const sortedContacts = useMemo(
+    () => [...(contactMethods || [])].sort((a, b) => a.sort_order - b.sort_order),
+    [contactMethods]
+  )
 
   const handleSaveSettings = async () => {
     if (!settings) return
@@ -122,6 +128,49 @@ export function SettingsPanel() {
     navigator.clipboard.writeText(adminPassword)
     setCopied('password')
     setTimeout(() => setCopied(null), 2000)
+  }
+
+  const handleContactDragStart = (e: React.DragEvent, id: string) => {
+    setDraggingContactId(id)
+    e.dataTransfer.effectAllowed = 'move'
+    try {
+      e.dataTransfer.setData('text/plain', id)
+    } catch {}
+  }
+
+  const handleContactDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dragOverContactId !== id) {
+      setDragOverContactId(id)
+    }
+  }
+
+  const handleContactDrop = async (e: React.DragEvent, targetId: string) => {
+    e.preventDefault()
+    const sourceId = draggingContactId
+    setDraggingContactId(null)
+    setDragOverContactId(null)
+    if (!sourceId || sourceId === targetId) return
+
+    const currentIds = sortedContacts.map((c) => c.id)
+    const fromIdx = currentIds.indexOf(sourceId)
+    const toIdx = currentIds.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) return
+
+    const nextIds = [...currentIds]
+    nextIds.splice(fromIdx, 1)
+    nextIds.splice(toIdx, 0, sourceId)
+
+    await Promise.all(
+      nextIds.map((id, index) => updateContactMethod(id, { sort_order: index }))
+    )
+    toast.success(language === 'zh' ? '联系方式排序已更新' : 'Contact order updated')
+  }
+
+  const handleContactDragEnd = () => {
+    setDraggingContactId(null)
+    setDragOverContactId(null)
   }
 
   return (
@@ -237,22 +286,32 @@ export function SettingsPanel() {
             <AddContactDialog onAdd={addContactMethod} language={language} />
           </div>
 
-          {contactMethods && contactMethods.length > 0 ? (
+          {sortedContacts.length > 0 ? (
             <div className="grid gap-4">
-              {contactMethods.map((contact) => (
-                <ContactMethodCard
+              {sortedContacts.map((contact) => (
+                <div
                   key={contact.id}
-                  contact={contact}
-                  isEditing={editingContactId === contact.id}
-                  onEdit={() => setEditingContactId(contact.id)}
-                  onCancelEdit={() => setEditingContactId(null)}
-                  onUpdate={(updated) => {
-                    updateContactMethod(updated.id, updated)
-                    setEditingContactId(null)
-                  }}
-                  onDelete={() => deleteContactMethod(contact.id)}
-                  language={language}
-                />
+                  draggable
+                  onDragStart={(e) => handleContactDragStart(e, contact.id)}
+                  onDragOver={(e) => handleContactDragOver(e, contact.id)}
+                  onDrop={(e) => handleContactDrop(e, contact.id)}
+                  onDragEnd={handleContactDragEnd}
+                  className={`transition ${dragOverContactId === contact.id && draggingContactId !== contact.id ? 'ring-2 ring-primary rounded-lg' : ''} ${draggingContactId === contact.id ? 'opacity-50' : ''}`}
+                >
+                  <ContactMethodCard
+                    contact={contact}
+                    isEditing={editingContactId === contact.id}
+                    onEdit={() => setEditingContactId(contact.id)}
+                    onCancelEdit={() => setEditingContactId(null)}
+                    onUpdate={(updated) => {
+                      updateContactMethod(updated.id, updated)
+                      setEditingContactId(null)
+                    }}
+                    onDelete={() => deleteContactMethod(contact.id)}
+                    onToggleEnabled={(enabled) => updateContactMethod(contact.id, { enabled })}
+                    language={language}
+                  />
+                </div>
               ))}
             </div>
           ) : (
@@ -408,6 +467,7 @@ interface ContactMethodCardProps {
   onCancelEdit: () => void
   onUpdate: (contact: any) => void
   onDelete: () => void
+  onToggleEnabled: (enabled: boolean) => void
   language: 'en' | 'zh'
 }
 
@@ -418,10 +478,12 @@ function ContactMethodCard({
   onCancelEdit,
   onUpdate,
   onDelete,
+  onToggleEnabled,
   language,
 }: ContactMethodCardProps) {
   const [editValue, setEditValue] = useState(contact.value)
   const [editLink, setEditLink] = useState(contact.link || '')
+  const [editLabel, setEditLabel] = useState(contact.label || '')
   const [uploadingQR, setUploadingQR] = useState(false)
 
   const platformInfo = CONTACT_PLATFORM_INFO[contact.platform]
@@ -431,12 +493,20 @@ function ContactMethodCard({
     uploadQR: '上传二维码',
     edit: '编辑',
     delete: '删除',
+    platformName: '平台名称',
+    dragToSort: '拖拽排序',
+    on: 'ON',
+    off: 'OFF',
   } : {
     save: 'Save',
     cancel: 'Cancel',
     uploadQR: 'Upload QR Code',
     edit: 'Edit',
     delete: 'Delete',
+    platformName: 'Platform Name',
+    dragToSort: 'Drag to sort',
+    on: 'ON',
+    off: 'OFF',
   }
 
   if (isEditing) {
@@ -462,6 +532,18 @@ function ContactMethodCard({
             />
           </div>
 
+          {contact.platform === 'custom' && (
+            <div>
+              <Label className="text-sm">{texts.platformName}</Label>
+              <Input
+                value={editLabel}
+                onChange={(e) => setEditLabel(e.target.value)}
+                placeholder={language === 'zh' ? '如：官网 / Telegram' : 'e.g., Website / Telegram'}
+                className="mt-1"
+              />
+            </div>
+          )}
+
           <div>
             <Label className="text-sm">{texts.uploadQR}</Label>
             <ImageUpload
@@ -472,6 +554,7 @@ function ContactMethodCard({
                     ...contact,
                     value: editValue,
                     link: editLink || null,
+                    label: contact.platform === 'custom' ? editLabel : contact.label,
                     qr_code_url: url,
                   })
                 } finally {
@@ -497,6 +580,7 @@ function ContactMethodCard({
                   ...contact,
                   value: editValue,
                   link: editLink || null,
+                  label: contact.platform === 'custom' ? editLabel : contact.label,
                 })
               }}
             >
@@ -517,10 +601,17 @@ function ContactMethodCard({
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
+              <span className="text-muted-foreground cursor-grab active:cursor-grabbing" title={texts.dragToSort}>
+                <GripVertical className="w-4 h-4" />
+              </span>
               <Badge variant="outline">
-                {language === 'zh' ? platformInfo.label.zh : platformInfo.label.en}
+                {contact.platform === 'custom' && contact.label
+                  ? contact.label
+                  : (language === 'zh' ? platformInfo.label.zh : platformInfo.label.en)}
               </Badge>
-              {contact.enabled && <Badge className="bg-green-100 text-green-800">ON</Badge>}
+              <Badge className={contact.enabled ? 'bg-green-100 text-green-800' : 'bg-muted text-muted-foreground'}>
+                {contact.enabled ? texts.on : texts.off}
+              </Badge>
             </div>
             <p className="text-sm font-mono text-gray-600">{contact.value}</p>
             {contact.link && (
@@ -539,6 +630,14 @@ function ContactMethodCard({
             )}
           </div>
           <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onToggleEnabled(!contact.enabled)}
+              title={contact.enabled ? (language === 'zh' ? '禁用' : 'Disable') : (language === 'zh' ? '启用' : 'Enable')}
+            >
+              {contact.enabled ? texts.on : texts.off}
+            </Button>
             <Button size="sm" variant="ghost" onClick={onEdit}>
               <Edit2 className="w-4 h-4" />
             </Button>
