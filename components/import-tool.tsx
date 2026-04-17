@@ -1,410 +1,421 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { ArrowLeft, Upload, FileJson, Check, AlertCircle, FileUp } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
+import { useState } from 'react'
 import { useApp } from '@/lib/app-context'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Textarea } from '@/components/ui/textarea'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Label } from '@/components/ui/label'
+import { AlertCircle, CheckCircle, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import type { AppData, Item } from '@/lib/types'
-import { CATEGORY_ICONS } from '@/lib/types'
 
-type ImportMode = 'replace' | 'merge-new' | 'merge-update'
-
-interface ValidationResult {
-  valid: boolean
-  data?: AppData
-  error?: string
-  lineHint?: number
-}
+type ImportMode = 'replace' | 'add' | 'update'
 
 export function ImportTool() {
-  const { setRoute, setData, data: currentData, t, lang } = useApp()
-  
+  const { addItem, updateItem, deleteItem, data, lang, refreshData } = useApp()
+  const language = lang || 'zh'
   const [jsonInput, setJsonInput] = useState('')
-  const [importMode, setImportMode] = useState<ImportMode>('replace')
-  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
+  const [importMode, setImportMode] = useState<ImportMode>('add')
+  const [validationResult, setValidationResult] = useState<any>(null)
   const [isImporting, setIsImporting] = useState(false)
 
-  const labels = {
-    title: { en: 'Import JSON Data', zh: '导入 JSON 数据' },
-    subtitle: { en: 'Import item data from a JSON file or paste JSON directly', zh: '从 JSON 文件导入或直接粘贴 JSON 数据' },
-    back: { en: 'Back to Admin', zh: '返回管理后台' },
-    pasteJson: { en: 'Paste JSON', zh: '粘贴 JSON' },
-    uploadFile: { en: 'Upload .json file', zh: '上传 .json 文件' },
-    orDragDrop: { en: 'or drag and drop', zh: '或拖拽文件到此处' },
-    validatePreview: { en: 'Validate & Preview', zh: '验证并预览' },
-    importMode: { en: 'Import Mode', zh: '导入模式' },
-    replaceAll: { en: 'Replace all', zh: '替换全部' },
-    replaceDesc: { en: 'Clears existing data and imports new data', zh: '清除现有数据，导入新数据' },
-    mergeNew: { en: 'Merge - add new items only', zh: '合并 - 仅添加新物品' },
-    mergeNewDesc: { en: 'Keeps existing items, adds new items with different IDs', zh: '保留现有物品，添加不同 ID 的新物品' },
-    mergeUpdate: { en: 'Merge - update existing items by ID', zh: '合并 - 按 ID 更新现有物品' },
-    mergeUpdateDesc: { en: 'Updates existing items with matching IDs, adds new items', zh: '更新匹配 ID 的物品，添加新物品' },
-    confirmImport: { en: 'Confirm Import', zh: '确认导入' },
-    validJson: { en: 'Valid JSON', zh: 'JSON 格式正确' },
-    invalidJson: { en: 'Invalid JSON', zh: 'JSON 格式错误' },
-    previewItems: { en: 'Preview of items to import:', zh: '待导入物品预览：' },
-    name: { en: 'Name', zh: '名称' },
-    category: { en: 'Category', zh: '分类' },
-    price: { en: 'Price', zh: '价格' },
-    status: { en: 'Status', zh: '状态' },
-    importSuccess: { en: 'Data imported successfully!', zh: '数据导入成功！' },
-    fixHint: { en: 'Fix hint', zh: '修复建议' },
-    noItems: { en: 'No items found in JSON', zh: 'JSON 中没有找到物品' },
+  const texts = {
+    en: {
+      importData: 'Import Data',
+      pasteJSON: 'Paste JSON',
+      uploadFile: 'Upload File',
+      importMode: 'Import Mode',
+      replaceAll: 'Replace All - Delete existing items and import new ones',
+      addOnly: 'Add Only - Import only new items (skip duplicates)',
+      updateById: 'Update by ID - Update items with matching ID',
+      validate: 'Validate',
+      import: 'Import',
+      importing: 'Importing...',
+      validating: 'Validating...',
+      validated: 'Validated - Found {count} items',
+      errors: 'Validation Errors',
+      noJSON: 'Please enter or upload JSON data',
+      invalidJSON: 'Invalid JSON format',
+      success: 'Import successful!',
+      failed: 'Import failed',
+      preview: 'Preview',
+      noItems: 'No items found in JSON',
+    },
+    zh: {
+      importData: '导入数据',
+      pasteJSON: '粘贴JSON',
+      uploadFile: '上传文件',
+      importMode: '导入模式',
+      replaceAll: '全部替换 - 删除现有物品并导入新物品',
+      addOnly: '仅添加 - 仅导入新物品（跳过重复项）',
+      updateById: '按ID更新 - 更新匹配ID的物品',
+      validate: '验证',
+      import: '导入',
+      importing: '导入中...',
+      validating: '验证中...',
+      validated: '验证成功 - 找到 {count} 件物品',
+      errors: '验证错误',
+      noJSON: '请输入或上传JSON数据',
+      invalidJSON: '无效的JSON格式',
+      success: '导入成功！',
+      failed: '导入失败',
+      preview: '预览',
+      noItems: '在JSON中未找到物品',
+    }
   }
 
-  const validateJson = useCallback((input: string): ValidationResult => {
-    if (!input.trim()) {
-      return { valid: false, error: 'Please paste or upload JSON data' }
+  const t = texts[language]
+
+  // 规范化数据 - 支持多种JSON格式
+  const normalizeData = (data: any): any[] => {
+    // 如果是直接的items数组
+    if (Array.isArray(data)) {
+      return data
     }
 
+    // 如果是包含items字段的对象
+    if (data.items && Array.isArray(data.items)) {
+      return data.items
+    }
+
+    // 如果是包含goods字段的对象
+    if (data.goods && Array.isArray(data.goods)) {
+      return data.goods
+    }
+
+    // 如果是包含products字段的对象
+    if (data.products && Array.isArray(data.products)) {
+      return data.products
+    }
+
+    return []
+  }
+
+  // 验证和转换单个物品
+  const validateItem = (item: any, index: number): { valid: boolean; item?: any; error?: string } => {
     try {
-      const parsed = JSON.parse(input)
-      
-      // Check if it's an AppData structure
-      if (parsed.items && Array.isArray(parsed.items)) {
-        // Validate items have required fields
-        for (let i = 0; i < parsed.items.length; i++) {
-          const item = parsed.items[i]
-          if (!item.id || !item.title) {
-            return {
-              valid: false,
-              error: `Item at index ${i} is missing required fields (id, title)`,
-              lineHint: i + 1
-            }
-          }
-        }
-        
-        return { valid: true, data: parsed as AppData }
-      }
-      
-      // Check if it's just an array of items
-      if (Array.isArray(parsed)) {
-        for (let i = 0; i < parsed.length; i++) {
-          const item = parsed[i]
-          if (!item.id || !item.title) {
-            return {
-              valid: false,
-              error: `Item at index ${i} is missing required fields (id, title)`,
-              lineHint: i + 1
-            }
-          }
-        }
-        
-        return { 
-          valid: true, 
-          data: { 
-            ...currentData,
-            items: parsed as Item[]
-          } 
-        }
+      // 基础字段检查
+      const title = item.title_zh || item.title || item.name_zh || item.name || ''
+      const askingPrice = parseFloat(item.asking_price || item.price || item.cost || 0)
+
+      if (!title) {
+        return { valid: false, error: `物品${index + 1}: 缺少标题` }
       }
 
-      // Single item
-      if (parsed.id && parsed.title) {
-        return {
-          valid: true,
-          data: {
-            ...currentData,
-            items: [parsed as Item]
-          }
-        }
-      }
-
-      return { 
-        valid: false, 
-        error: 'JSON structure not recognized. Expected AppData with items array, an array of items, or a single item object.' 
-      }
-    } catch (e) {
-      const error = e as SyntaxError
-      const match = error.message.match(/position (\d+)/)
-      const position = match ? parseInt(match[1]) : undefined
-      
-      let lineHint: number | undefined
-      if (position !== undefined) {
-        const lines = input.substring(0, position).split('\n')
-        lineHint = lines.length
+      if (askingPrice <= 0) {
+        return { valid: false, error: `物品${index + 1}: 价格必须大于0` }
       }
 
       return {
-        valid: false,
-        error: `JSON syntax error: ${error.message}`,
-        lineHint
+        valid: true,
+        item: {
+          title_zh: title,
+          title_en: item.title_en || null,
+          description_zh: item.description_zh || item.description || null,
+          description_en: item.description_en || null,
+          category: item.category || 'other',
+          condition: item.condition || 'good',
+          asking_price: askingPrice,
+          original_price: item.original_price ? parseFloat(item.original_price) : null,
+          status: item.status || 'available',
+          images: Array.isArray(item.images) ? item.images : (item.image ? [item.image] : []),
+          tags: Array.isArray(item.tags) ? item.tags : [],
+          bundle_id: item.bundle_id || null,
+          featured: item.featured || false,
+          available_from: item.available_from || null,
+          available_until: item.available_until || null,
+          sell_priority: item.sell_priority || 5,
+          allow_viewing: item.allow_viewing !== false,
+          purchase_link: item.purchase_link || null,
+          notes_zh: item.notes_zh || item.notes || null,
+          notes_en: item.notes_en || null,
+          id: item.id || null, // 可能没有ID
+        },
       }
+    } catch (error) {
+      return { valid: false, error: `物品${index + 1}: 格式错误 - ${(error as Error).message}` }
     }
-  }, [currentData])
-
-  const handleValidate = () => {
-    const result = validateJson(jsonInput)
-    setValidationResult(result)
   }
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+  const handleValidate = () => {
+    if (!jsonInput.trim()) {
+      toast.error(t.noJSON)
+      return
+    }
+
+    try {
+      const data = JSON.parse(jsonInput)
+      const items = normalizeData(data)
+
+      if (items.length === 0) {
+        toast.error(t.noItems)
+        return
+      }
+
+      const validatedItems = []
+      const errors = []
+
+      items.forEach((item, index) => {
+        const result = validateItem(item, index)
+        if (result.valid && result.item) {
+          validatedItems.push(result.item)
+        } else if (result.error) {
+          errors.push(result.error)
+        }
+      })
+
+      setValidationResult({
+        total: items.length,
+        valid: validatedItems.length,
+        errors,
+        items: validatedItems,
+      })
+
+      if (errors.length === 0) {
+        toast.success(t.validated.replace('{count}', validatedItems.length.toString()))
+      } else {
+        toast.error(`${validatedItems.length}/${items.length} ${language === 'zh' ? '有效' : 'valid'}`)
+      }
+    } catch (error) {
+      toast.error(t.invalidJSON)
+      setValidationResult(null)
+    }
+  }
+
+  const handleImport = async () => {
+    if (!validationResult) {
+      toast.error(language === 'zh' ? '请先验证数据' : 'Please validate data first')
+      return
+    }
+
+    setIsImporting(true)
+    try {
+      const items = validationResult.items
+      
+      if (importMode === 'replace') {
+        // Delete all existing items first
+        for (const existingItem of data.items) {
+          await deleteItem(existingItem.id)
+        }
+      }
+
+      for (const item of items) {
+        if (importMode === 'update' && item.id) {
+          // Try to find existing item by id
+          const existing = data.items.find(i => i.id === item.id)
+          if (existing) {
+            const { id, ...updates } = item
+            await updateItem(id, updates)
+          } else {
+            const { id, ...newItem } = item
+            await addItem(newItem)
+          }
+        } else {
+          // Add as new item (remove id if present)
+          const { id, ...newItem } = item
+          await addItem(newItem)
+        }
+      }
+      
+      await refreshData()
+      toast.success(t.success)
+      setJsonInput('')
+      setValidationResult(null)
+    } catch (error) {
+      toast.error(t.failed)
+      console.error(error)
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
     if (!file) return
 
     const reader = new FileReader()
     reader.onload = (e) => {
-      const content = e.target?.result as string
-      setJsonInput(content)
-      setValidationResult(null)
-    }
-    reader.readAsText(file)
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files?.[0]
-    if (!file || !file.name.endsWith('.json')) return
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
-      setJsonInput(content)
-      setValidationResult(null)
-    }
-    reader.readAsText(file)
-  }, [])
-
-  const handleImport = () => {
-    if (!validationResult?.valid || !validationResult.data) return
-
-    setIsImporting(true)
-    
-    setTimeout(() => {
-      const newData = validationResult.data!
-
-      switch (importMode) {
-        case 'replace':
-          setData(newData)
-          break
-          
-        case 'merge-new': {
-          const existingIds = new Set(currentData.items.map(i => i.id))
-          const newItems = newData.items.filter(i => !existingIds.has(i.id))
-          setData({
-            ...currentData,
-            items: [...currentData.items, ...newItems],
-            bundles: [...currentData.bundles, ...(newData.bundles || []).filter(
-              b => !currentData.bundles.some(cb => cb.id === b.id)
-            )]
-          })
-          break
-        }
-          
-        case 'merge-update': {
-          const itemMap = new Map(currentData.items.map(i => [i.id, i]))
-          newData.items.forEach(item => {
-            itemMap.set(item.id, item)
-          })
-          
-          const bundleMap = new Map(currentData.bundles.map(b => [b.id, b]))
-          newData.bundles?.forEach(bundle => {
-            bundleMap.set(bundle.id, bundle)
-          })
-          
-          setData({
-            meta: newData.meta || currentData.meta,
-            items: Array.from(itemMap.values()),
-            bundles: Array.from(bundleMap.values())
-          })
-          break
-        }
+      try {
+        const content = e.target?.result as string
+        setJsonInput(content)
+      } catch (error) {
+        toast.error(language === 'zh' ? '读取文件失败' : 'Failed to read file')
       }
-
-      setIsImporting(false)
-      toast.success(t(labels.importSuccess))
-      setRoute('admin')
-    }, 500)
+    }
+    reader.readAsText(file)
   }
 
   return (
-    <div className="container px-4 py-8 max-w-3xl mx-auto">
-      <Button
-        variant="ghost"
-        onClick={() => setRoute('admin')}
-        className="mb-6"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        {t(labels.back)}
-      </Button>
+    <div className="space-y-6">
+      <Tabs defaultValue="paste" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="paste">{t.pasteJSON}</TabsTrigger>
+          <TabsTrigger value="upload">{t.uploadFile}</TabsTrigger>
+        </TabsList>
 
-      <div className="text-center mb-8">
-        <h1 className="text-2xl md:text-3xl font-serif font-semibold mb-2">
-          {t(labels.title)}
-        </h1>
-        <p className="text-muted-foreground">
-          {t(labels.subtitle)}
-        </p>
-      </div>
+        {/* Paste JSON Tab */}
+        <TabsContent value="paste" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.importData}</CardTitle>
+              <CardDescription>{language === 'zh' ? '粘贴您从AI生成或导出的JSON数据' : 'Paste JSON data from AI generation or export'}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                value={jsonInput}
+                onChange={(e) => setJsonInput(e.target.value)}
+                placeholder={`{
+  "items": [
+    {
+      "title_zh": "沙发",
+      "asking_price": 200,
+      "category": "furniture",
+      "condition": "good"
+    }
+  ]
+}`}
+                className="font-mono text-sm min-h-40"
+              />
 
-      {/* JSON Input */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <FileJson className="h-5 w-5" />
-            {t(labels.pasteJson)}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            value={jsonInput}
-            onChange={(e) => {
-              setJsonInput(e.target.value)
-              setValidationResult(null)
-            }}
-            placeholder='{"items": [...]}'
-            rows={10}
-            className="font-mono text-sm"
-          />
-          
-          {/* File upload */}
-          <label
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-            className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors"
-          >
-            <Upload className="h-8 w-8 text-muted-foreground" />
-            <div className="text-center">
-              <span className="text-sm font-medium">{t(labels.uploadFile)}</span>
-              <p className="text-xs text-muted-foreground">{t(labels.orDragDrop)}</p>
-            </div>
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </label>
+              <Button onClick={handleValidate} className="w-full">
+                {t.validate}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <Button 
-            onClick={handleValidate}
-            className="w-full rounded-full"
-            disabled={!jsonInput.trim()}
-          >
-            {t(labels.validatePreview)}
-          </Button>
-        </CardContent>
-      </Card>
+        {/* Upload File Tab */}
+        <TabsContent value="upload" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.uploadFile}</CardTitle>
+              <CardDescription>{language === 'zh' ? '选择一个JSON文件来上传' : 'Select a JSON file to upload'}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                <Label htmlFor="file-input" className="cursor-pointer">
+                  <p className="text-sm font-medium">{language === 'zh' ? '点击选择文件或拖拽上传' : 'Click to select or drag & drop'}</p>
+                </Label>
+                <input
+                  id="file-input"
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </div>
 
-      {/* Validation Result */}
+              {jsonInput && (
+                <Button onClick={handleValidate} className="w-full">
+                  {t.validate}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Validation Results */}
       {validationResult && (
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            {validationResult.valid ? (
-              <>
-                <Alert className="mb-4 border-secondary bg-secondary/10">
-                  <Check className="h-4 w-4 text-secondary" />
-                  <AlertTitle>{t(labels.validJson)}</AlertTitle>
-                  <AlertDescription>
-                    {validationResult.data?.items.length || 0} items found
-                  </AlertDescription>
-                </Alert>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {validationResult.errors.length === 0 ? (
+                <>
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  {language === 'zh' ? '验证成功' : 'Validation Passed'}
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-5 h-5 text-orange-600" />
+                  {language === 'zh' ? '部分数据有问题' : 'Some data has issues'}
+                </>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-sm">
+              <p>{language === 'zh' ? '总计' : 'Total'}: {validationResult.total}</p>
+              <p className="text-green-600">{language === 'zh' ? '有效' : 'Valid'}: {validationResult.valid}</p>
+              {validationResult.errors.length > 0 && (
+                <p className="text-orange-600">{language === 'zh' ? '错误' : 'Errors'}: {validationResult.errors.length}</p>
+              )}
+            </div>
 
-                {/* Preview table */}
-                {validationResult.data && validationResult.data.items.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-sm font-medium mb-2">{t(labels.previewItems)}</p>
-                    <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>{t(labels.name)}</TableHead>
-                            <TableHead>{t(labels.category)}</TableHead>
-                            <TableHead>{t(labels.price)}</TableHead>
-                            <TableHead>{t(labels.status)}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {validationResult.data.items.slice(0, 10).map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell className="font-medium">
-                                {item.title?.[lang] || item.title?.en || item.title?.zh || 'Untitled'}
-                              </TableCell>
-                              <TableCell>
-                                {CATEGORY_ICONS[item.category] || '📦'} {item.category}
-                              </TableCell>
-                              <TableCell>${item.asking_price}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{item.status}</Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                    {validationResult.data.items.length > 10 && (
-                      <p className="text-xs text-muted-foreground mt-2 text-center">
-                        ...and {validationResult.data.items.length - 10} more items
-                      </p>
+            {validationResult.errors.length > 0 && (
+              <Alert className="bg-orange-50 border-orange-200">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-sm">
+                  <ul className="list-disc pl-5 space-y-1 mt-2">
+                    {validationResult.errors.slice(0, 5).map((error: string, i: number) => (
+                      <li key={i}>{error}</li>
+                    ))}
+                    {validationResult.errors.length > 5 && (
+                      <li>... {language === 'zh' ? '还有' : 'and'} {validationResult.errors.length - 5} {language === 'zh' ? '个错误' : 'more errors'}</li>
                     )}
-                  </div>
-                )}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
 
-                {/* Import mode */}
-                <div className="space-y-3">
-                  <Label>{t(labels.importMode)}</Label>
+            {validationResult.valid > 0 && (
+              <>
+                {/* Import Mode Selection */}
+                <div className="space-y-3 border-t pt-4">
+                  <Label className="font-semibold">{t.importMode}</Label>
                   <RadioGroup value={importMode} onValueChange={(v) => setImportMode(v as ImportMode)}>
-                    <div className="flex items-start space-x-3">
+                    <div className="flex items-start space-x-2">
+                      <RadioGroupItem value="add" id="add" />
+                      <Label htmlFor="add" className="font-normal cursor-pointer text-sm">
+                        <div>{language === 'zh' ? '仅添加' : 'Add Only'}</div>
+                        <div className="text-xs text-gray-500">{t.addOnly}</div>
+                      </Label>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <RadioGroupItem value="update" id="update" />
+                      <Label htmlFor="update" className="font-normal cursor-pointer text-sm">
+                        <div>{language === 'zh' ? '按ID更新' : 'Update by ID'}</div>
+                        <div className="text-xs text-gray-500">{t.updateById}</div>
+                      </Label>
+                    </div>
+                    <div className="flex items-start space-x-2">
                       <RadioGroupItem value="replace" id="replace" />
-                      <div className="grid gap-1">
-                        <Label htmlFor="replace" className="font-medium">{t(labels.replaceAll)}</Label>
-                        <p className="text-xs text-muted-foreground">{t(labels.replaceDesc)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <RadioGroupItem value="merge-new" id="merge-new" />
-                      <div className="grid gap-1">
-                        <Label htmlFor="merge-new" className="font-medium">{t(labels.mergeNew)}</Label>
-                        <p className="text-xs text-muted-foreground">{t(labels.mergeNewDesc)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <RadioGroupItem value="merge-update" id="merge-update" />
-                      <div className="grid gap-1">
-                        <Label htmlFor="merge-update" className="font-medium">{t(labels.mergeUpdate)}</Label>
-                        <p className="text-xs text-muted-foreground">{t(labels.mergeUpdateDesc)}</p>
-                      </div>
+                      <Label htmlFor="replace" className="font-normal cursor-pointer text-sm">
+                        <div>{language === 'zh' ? '全部替换' : 'Replace All'}</div>
+                        <div className="text-xs text-gray-500">{t.replaceAll}</div>
+                      </Label>
                     </div>
                   </RadioGroup>
                 </div>
 
+                {/* Preview */}
+                <div className="border-t pt-4 max-h-40 overflow-y-auto bg-gray-50 p-3 rounded text-xs font-mono">
+                  <p className="font-semibold mb-2">{t.preview}:</p>
+                  {validationResult.items.slice(0, 3).map((item: any, i: number) => (
+                    <div key={i} className="mb-2 pb-2 border-b last:border-b-0">
+                      <p className="truncate">
+                        {item.title_zh} - ¥{item.asking_price} ({item.condition})
+                      </p>
+                    </div>
+                  ))}
+                  {validationResult.items.length > 3 && (
+                    <p className="text-gray-500">... {language === 'zh' ? '共' : 'Total'} {validationResult.items.length} {language === 'zh' ? '件' : 'items'}</p>
+                  )}
+                </div>
+
+                {/* Import Button */}
                 <Button
                   onClick={handleImport}
-                  className="w-full mt-6 rounded-full"
                   disabled={isImporting}
+                  className="w-full bg-green-600 hover:bg-green-700"
                 >
-                  <FileUp className="h-4 w-4 mr-2" />
-                  {t(labels.confirmImport)}
+                  {isImporting ? t.importing : t.import}
                 </Button>
               </>
-            ) : (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>{t(labels.invalidJson)}</AlertTitle>
-                <AlertDescription>
-                  {validationResult.error}
-                  {validationResult.lineHint && (
-                    <p className="mt-1 text-xs">
-                      {t(labels.fixHint)}: Check around line {validationResult.lineHint}
-                    </p>
-                  )}
-                </AlertDescription>
-              </Alert>
             )}
           </CardContent>
         </Card>

@@ -130,10 +130,15 @@ export function HeroSection() {
           <div className="flex flex-wrap items-center justify-center gap-4 text-muted-foreground">
             {settings.location && (
               <>
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  <span>{settings.location}</span>
-                </div>
+                <button
+                  onClick={() => window.open(`https://maps.google.com/maps/search/${encodeURIComponent(settings.location)}`, '_blank')}
+                  className="flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer group"
+                  title={lang === 'zh' ? '在Google地图中打开' : 'Open in Google Maps'}
+                >
+                  <MapPin className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
+                  <span className="underline decoration-dashed underline-offset-2">{settings.location}</span>
+                  <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
                 <span className="hidden sm:inline text-border">|</span>
               </>
             )}

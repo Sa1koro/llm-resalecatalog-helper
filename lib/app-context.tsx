@@ -457,3 +457,6 @@ export function useApp() {
   }
   return context
 }
+
+// Alias for backward compatibility
+export const useAppContext = useApp

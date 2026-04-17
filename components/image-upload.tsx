@@ -2,25 +2,38 @@
 
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Upload, X, Loader2, ImageIcon } from 'lucide-react'
-import Image from 'next/image'
+import { Upload, X, Loader2, ImageIcon, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 interface ImageUploadProps {
-  images: string[]
-  onChange: (images: string[]) => void
+  onUpload?: (url: string) => Promise<void> | void
+  isLoading?: boolean
+  images?: string[]
+  onChange?: (images: string[]) => void
   maxImages?: number
   disabled?: boolean
 }
 
-export function ImageUpload({ images, onChange, maxImages = 5, disabled }: ImageUploadProps) {
+export function ImageUpload({
+  onUpload,
+  isLoading: externalLoading = false,
+  images = [],
+  onChange,
+  maxImages = 5,
+  disabled
+}: ImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [urlInputValue, setUrlInputValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
-    if (images.length >= maxImages) return
+    if (images.length >= maxImages) {
+      toast.error('已达到最大图片数量')
+      return
+    }
 
     setUploading(true)
     const newImages: string[] = []
@@ -28,36 +41,65 @@ export function ImageUpload({ images, onChange, maxImages = 5, disabled }: Image
     try {
       for (let i = 0; i < files.length && images.length + newImages.length < maxImages; i++) {
         const file = files[i]
-        if (!file.type.startsWith('image/')) continue
+        if (!file.type.startsWith('image/')) {
+          toast.error(`${file.name} 不是图片文件`)
+          continue
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+          toast.error(`${file.name} 超过10MB限制`)
+          continue
+        }
 
         const formData = new FormData()
         formData.append('file', file)
 
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        })
+        try {
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          })
 
-        if (response.ok) {
+          if (!response.ok) {
+            const error = await response.json()
+            toast.error(`上传失败: ${error.error || response.statusText}`)
+            continue
+          }
+
           const data = await response.json()
-          newImages.push(data.url)
+          if (data.url) {
+            newImages.push(data.url)
+            if (onUpload) {
+              await onUpload(data.url)
+            }
+          }
+        } catch (error) {
+          console.error('[v0] Upload error:', error)
+          toast.error(`上传 ${file.name} 失败`)
         }
       }
 
-      if (newImages.length > 0) {
+      if (newImages.length > 0 && onChange) {
         onChange([...images, ...newImages])
       }
-    } catch (error) {
-      console.error('Upload failed:', error)
+
+      if (newImages.length > 0) {
+        toast.success(`成功上传 ${newImages.length} 张图片`)
+      }
     } finally {
       setUploading(false)
+      if (inputRef.current) {
+        inputRef.current.value = ''
+      }
     }
   }
 
   const handleRemove = async (index: number) => {
     const urlToRemove = images[index]
     const newImages = images.filter((_, i) => i !== index)
-    onChange(newImages)
+    if (onChange) {
+      onChange(newImages)
+    }
 
     // Try to delete from blob storage
     try {
@@ -67,7 +109,7 @@ export function ImageUpload({ images, onChange, maxImages = 5, disabled }: Image
         body: JSON.stringify({ url: urlToRemove }),
       })
     } catch (error) {
-      console.error('Failed to delete image:', error)
+      console.error('[v0] Failed to delete image:', error)
     }
   }
 
@@ -77,31 +119,54 @@ export function ImageUpload({ images, onChange, maxImages = 5, disabled }: Image
     handleUpload(e.dataTransfer.files)
   }
 
+  const handleAddUrl = async () => {
+    if (!urlInputValue.trim()) return
+    if (images.length >= maxImages) {
+      toast.error('已达到最大图片数量')
+      return
+    }
+
+    try {
+      // Validate URL
+      new URL(urlInputValue)
+      if (onChange) {
+        onChange([...images, urlInputValue])
+      }
+      if (onUpload) {
+        await onUpload(urlInputValue)
+      }
+      setUrlInputValue('')
+      toast.success('图片链接已添加')
+    } catch {
+      toast.error('请输入有效的URL')
+    }
+  }
+
+  const isLoading = uploading || externalLoading
+
   return (
     <div className="space-y-3">
       {/* Image Grid */}
       {images.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+        <div className="grid grid-cols-4 gap-2">
           {images.map((url, index) => (
-            <div key={url} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
-              <Image
+            <div key={`${url}-${index}`} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
+              <img
                 src={url}
                 alt={`Image ${index + 1}`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, 20vw"
+                className="w-full h-full object-cover"
               />
               <button
                 type="button"
                 onClick={() => handleRemove(index)}
-                disabled={disabled}
+                disabled={disabled || isLoading}
                 className="absolute right-1 top-1 rounded-full bg-destructive p-1 text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 disabled:cursor-not-allowed"
               >
                 <X className="h-3 w-3" />
               </button>
               {index === 0 && (
                 <span className="absolute bottom-1 left-1 rounded bg-primary/80 px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
-                  封面
+                  主图
                 </span>
               )}
             </div>
@@ -121,11 +186,11 @@ export function ImageUpload({ images, onChange, maxImages = 5, disabled }: Image
           className={cn(
             'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors',
             dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50',
-            disabled && 'cursor-not-allowed opacity-50'
+            (disabled || isLoading) && 'cursor-not-allowed opacity-50'
           )}
-          onClick={() => !disabled && inputRef.current?.click()}
+          onClick={() => !disabled && !isLoading && inputRef.current?.click()}
         >
-          {uploading ? (
+          {isLoading ? (
             <>
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <span className="text-sm text-muted-foreground">上传中...</span>
@@ -151,7 +216,7 @@ export function ImageUpload({ images, onChange, maxImages = 5, disabled }: Image
             multiple
             className="hidden"
             onChange={(e) => handleUpload(e.target.files)}
-            disabled={disabled || uploading}
+            disabled={disabled || isLoading}
           />
         </div>
       )}
@@ -166,33 +231,23 @@ export function ImageUpload({ images, onChange, maxImages = 5, disabled }: Image
         <input
           type="url"
           placeholder="https://example.com/image.jpg"
+          value={urlInputValue}
+          onChange={(e) => setUrlInputValue(e.target.value)}
           className="flex-1 rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
-              const input = e.target as HTMLInputElement
-              const url = input.value.trim()
-              if (url && images.length < maxImages) {
-                onChange([...images, url])
-                input.value = ''
-              }
+              handleAddUrl()
             }
           }}
-          disabled={disabled || images.length >= maxImages}
+          disabled={disabled || isLoading || images.length >= maxImages}
         />
         <Button
           type="button"
           variant="outline"
           size="sm"
-          disabled={disabled || images.length >= maxImages}
-          onClick={(e) => {
-            const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement
-            const url = input.value.trim()
-            if (url && images.length < maxImages) {
-              onChange([...images, url])
-              input.value = ''
-            }
-          }}
+          disabled={disabled || isLoading || images.length >= maxImages || !urlInputValue.trim()}
+          onClick={handleAddUrl}
         >
           添加
         </Button>
