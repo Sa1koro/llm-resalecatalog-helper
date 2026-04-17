@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
-import { useAppContext } from '@/lib/app-context'
+import { useApp } from '@/lib/app-context'
 import { ImageUpload } from '@/components/image-upload'
 import { toast } from 'sonner'
 import { 
@@ -46,7 +46,9 @@ const CONDITIONS: Condition[] = ['like-new', 'good', 'fair', 'well-loved']
 const STATUSES: ItemStatus[] = ['available', 'reserved', 'sold']
 
 export function ItemFormModal({ item, isOpen, onClose }: ItemFormModalProps) {
-  const { addItem, updateItem, bundles, language } = useAppContext()
+  const { addItem, updateItem, data, lang } = useApp()
+  const bundles = data.bundles
+  const language = lang || 'zh'
   const isEditing = !!item
 
   // Form state

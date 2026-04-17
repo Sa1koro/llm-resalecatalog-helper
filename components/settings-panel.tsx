@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useAppContext } from '@/lib/app-context'
+import { useApp } from '@/lib/app-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,7 +16,10 @@ import { ImageUpload } from '@/components/image-upload'
 import { toast } from 'sonner'
 
 export function SettingsPanel() {
-  const { settings, updateSettings, contactMethods, addContactMethod, updateContactMethod, removeContactMethod, language } = useAppContext()
+  const { data, updateSettings, addContactMethod, updateContactMethod, deleteContactMethod, lang } = useApp()
+  const settings = data.settings
+  const contactMethods = data.contactMethods
+  const language = lang || 'zh'
   const [activeTab, setActiveTab] = useState('basic')
   const [sellerName, setSellerName] = useState(settings?.seller_name || '')
   const [location, setLocation] = useState(settings?.location || '')
@@ -223,10 +226,10 @@ export function SettingsPanel() {
                   onEdit={() => setEditingContactId(contact.id)}
                   onCancelEdit={() => setEditingContactId(null)}
                   onUpdate={(updated) => {
-                    updateContactMethod(updated)
+                    updateContactMethod(updated.id, updated)
                     setEditingContactId(null)
                   }}
-                  onDelete={() => removeContactMethod(contact.id)}
+                  onDelete={() => deleteContactMethod(contact.id)}
                   language={language}
                 />
               ))}

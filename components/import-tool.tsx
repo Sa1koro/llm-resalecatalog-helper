@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useAppContext } from '@/lib/app-context'
+import { useApp } from '@/lib/app-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -15,7 +15,8 @@ import { toast } from 'sonner'
 type ImportMode = 'replace' | 'add' | 'update'
 
 export function ImportTool() {
-  const { importItems, language } = useAppContext()
+  const { addItem, updateItem, deleteItem, data, lang, refreshData } = useApp()
+  const language = lang || 'zh'
   const [jsonInput, setJsonInput] = useState('')
   const [importMode, setImportMode] = useState<ImportMode>('add')
   const [validationResult, setValidationResult] = useState<any>(null)
@@ -192,7 +193,34 @@ export function ImportTool() {
 
     setIsImporting(true)
     try {
-      await importItems(validationResult.items, importMode)
+      const items = validationResult.items
+      
+      if (importMode === 'replace') {
+        // Delete all existing items first
+        for (const existingItem of data.items) {
+          await deleteItem(existingItem.id)
+        }
+      }
+
+      for (const item of items) {
+        if (importMode === 'update' && item.id) {
+          // Try to find existing item by id
+          const existing = data.items.find(i => i.id === item.id)
+          if (existing) {
+            const { id, ...updates } = item
+            await updateItem(id, updates)
+          } else {
+            const { id, ...newItem } = item
+            await addItem(newItem)
+          }
+        } else {
+          // Add as new item (remove id if present)
+          const { id, ...newItem } = item
+          await addItem(newItem)
+        }
+      }
+      
+      await refreshData()
       toast.success(t.success)
       setJsonInput('')
       setValidationResult(null)
