@@ -20,10 +20,14 @@ import {
 } from '@/components/ui/select'
 import { useApp } from '@/lib/app-context'
 import { toast } from 'sonner'
-import { 
+import {
   CATEGORY_LABELS,
   CONDITION_LABELS,
-  type Item 
+  getItemTitle,
+  getItemDescription,
+  CONTACT_PLATFORM_INFO,
+  type Item,
+  type ContactMethod,
 } from '@/lib/types'
 
 interface PostGeneratorModalProps {
@@ -32,6 +36,19 @@ interface PostGeneratorModalProps {
 }
 
 type ImageSize = 'square' | 'landscape' | 'story'
+
+function formatContactMethod(method: ContactMethod, lang: 'zh' | 'en'): string {
+  const info = CONTACT_PLATFORM_INFO[method.platform]
+  const platformLabel = info ? info.label[lang] : method.platform
+  const labelPart = method.label ? method.label : platformLabel
+  return `${labelPart}: ${method.value}`
+}
+
+function getPrimaryContactLine(methods: ContactMethod[], lang: 'zh' | 'en'): string {
+  const enabled = methods.filter(m => m.enabled)
+  if (enabled.length === 0) return lang === 'zh' ? '（请在后台设置联系方式）' : '(Please configure contact methods)'
+  return enabled.slice(0, 2).map(m => formatContactMethod(m, lang)).join(' / ')
+}
 
 export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
   const { data, t, lang } = useApp()
@@ -66,68 +83,95 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
   useEffect(() => {
     if (!item) return
 
-    const discountPercent = Math.round(
-      ((item.original_price - item.asking_price) / item.original_price) * 100
-    )
+    const titleZh = item.title_zh
+    const titleEn = item.title_en || item.title_zh
+    const descriptionZh = item.description_zh || ''
+    const descriptionEn = item.description_en || item.description_zh || ''
+    const notesZh = item.notes_zh || ''
+    const notesEn = item.notes_en || item.notes_zh || ''
 
-    // Generate Xiaohongshu post
-    const xhsPost = `✨ ${item.title.zh} ✨
+    const location = data.settings.location || ''
+    const contactsZh = getPrimaryContactLine(data.contactMethods, 'zh')
+    const contactsEn = getPrimaryContactLine(data.contactMethods, 'en')
 
-💰 特价出售 CAD $${item.asking_price}（原价 $${item.original_price}，省${discountPercent}%！）
+    const discountPercent = item.original_price
+      ? Math.round(((item.original_price - item.asking_price) / item.original_price) * 100)
+      : 0
+    const originalPriceLineZh = item.original_price
+      ? `💰 特价出售 CAD $${item.asking_price}（原价 $${item.original_price}，省${discountPercent}%！）`
+      : `💰 售价 CAD $${item.asking_price}`
+    const originalPriceLineEn = item.original_price
+      ? `💵 Price: CAD $${item.asking_price} (Originally $${item.original_price} - ${discountPercent}% OFF!)`
+      : `💵 Price: CAD $${item.asking_price}`
 
-📦 成色：${CONDITION_LABELS[item.condition].zh}
-📍 地点：${data.meta.location}
-📅 可取货时间：${item.available_from ? new Date(item.available_from).toLocaleDateString('zh-CN') : '即日起'}${item.available_until ? ` - ${new Date(item.available_until).toLocaleDateString('zh-CN')}` : ''}
-${item.allow_viewing ? '👀 可提前看货！' : ''}
-
-${item.description.zh}
-
-${item.notes?.zh ? `📝 备注：${item.notes.zh}\n` : ''}
-💬 联系方式：${data.meta.contact}
-
-#多伦多二手 #北约克二手 #搬家清仓 #${CATEGORY_LABELS[item.category].zh} ${item.tags?.map(tag => `#${tag}`).join(' ') || ''}`
+    // Xiaohongshu post (Chinese)
+    const xhsPost = [
+      `✨ ${titleZh} ✨`,
+      '',
+      originalPriceLineZh,
+      '',
+      `📦 成色：${CONDITION_LABELS[item.condition].zh}`,
+      location ? `📍 地点：${location}` : '',
+      `📅 可取货时间：${item.available_from ? new Date(item.available_from).toLocaleDateString('zh-CN') : '即日起'}${item.available_until ? ` - ${new Date(item.available_until).toLocaleDateString('zh-CN')}` : ''}`,
+      item.allow_viewing ? '👀 可提前看货！' : '',
+      '',
+      descriptionZh,
+      '',
+      notesZh ? `📝 备注：${notesZh}` : '',
+      `💬 联系方式：${contactsZh}`,
+      '',
+      `#多伦多二手 #北约克二手 #搬家清仓 #${CATEGORY_LABELS[item.category].zh} ${item.tags?.map(tag => `#${tag}`).join(' ') || ''}`,
+    ].filter(Boolean).join('\n')
 
     setXiaohongshuText(xhsPost)
 
-    // Generate Facebook post
-    const fbPost = `🏷️ ${item.title.en} [${CONDITION_LABELS[item.condition].en}]
-
-💵 Price: CAD $${item.asking_price} (Originally $${item.original_price} - ${discountPercent}% OFF!)
-
-📋 Details:
-• Condition: ${CONDITION_LABELS[item.condition].en}
-• Category: ${CATEGORY_LABELS[item.category].en}
-${item.allow_viewing ? '• Can view/test before purchase\n' : ''}
-📍 Pickup: ${data.meta.location}
-📅 Available: ${item.available_from ? new Date(item.available_from).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Now'}${item.available_until ? ` - ${new Date(item.available_until).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
-
-${item.description.en}
-
-${item.notes?.en ? `Note: ${item.notes.en}\n` : ''}
-💬 Contact: ${data.meta.contact}
-
-#MovingSale #SecondHand #Toronto #NorthYork #${item.category}`
+    // Facebook post (English)
+    const fbPost = [
+      `🏷️ ${titleEn} [${CONDITION_LABELS[item.condition].en}]`,
+      '',
+      originalPriceLineEn,
+      '',
+      '📋 Details:',
+      `• Condition: ${CONDITION_LABELS[item.condition].en}`,
+      `• Category: ${CATEGORY_LABELS[item.category].en}`,
+      item.allow_viewing ? '• Can view/test before purchase' : '',
+      location ? `📍 Pickup: ${location}` : '',
+      `📅 Available: ${item.available_from ? new Date(item.available_from).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Now'}${item.available_until ? ` - ${new Date(item.available_until).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}`,
+      '',
+      descriptionEn,
+      '',
+      notesEn ? `Note: ${notesEn}` : '',
+      `💬 Contact: ${contactsEn}`,
+      '',
+      `#MovingSale #SecondHand #Toronto #NorthYork #${item.category}`,
+    ].filter(Boolean).join('\n')
 
     setFacebookText(fbPost)
 
-    // Generate Discord post
-    const conditionStars = item.condition === 'like-new' ? '⭐⭐⭐⭐⭐' 
-      : item.condition === 'good' ? '⭐⭐⭐⭐' 
-      : item.condition === 'fair' ? '⭐⭐⭐' 
+    // Discord post (short English)
+    const conditionStars = item.condition === 'like-new' ? '⭐⭐⭐⭐⭐'
+      : item.condition === 'good' ? '⭐⭐⭐⭐'
+      : item.condition === 'fair' ? '⭐⭐⭐'
       : '⭐⭐'
 
-    const dcPost = `**${item.title.en}** — CAD $${item.asking_price}
+    const shortDesc = descriptionEn
+      ? `> ${descriptionEn.slice(0, 100)}${descriptionEn.length > 100 ? '...' : ''}`
+      : ''
 
-> ${item.description.en.slice(0, 100)}${item.description.en.length > 100 ? '...' : ''}
-
-${conditionStars} ${CONDITION_LABELS[item.condition].en}
-📍 ${data.meta.location}
-${item.allow_viewing ? '👀 Viewable' : ''}
-
-DM me or contact: \`${data.meta.contact}\``
+    const dcPost = [
+      `**${titleEn}** — CAD $${item.asking_price}`,
+      '',
+      shortDesc,
+      '',
+      `${conditionStars} ${CONDITION_LABELS[item.condition].en}`,
+      location ? `📍 ${location}` : '',
+      item.allow_viewing ? '👀 Viewable' : '',
+      '',
+      `DM me or contact: \`${contactsEn}\``,
+    ].filter(Boolean).join('\n')
 
     setDiscordText(dcPost)
-  }, [item, data.meta])
+  }, [item, data.settings, data.contactMethods])
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -147,61 +191,67 @@ DM me or contact: \`${data.meta.contact}\``
     canvas.width = width
     canvas.height = height
 
-    // Background
+    const title = getItemTitle(item, lang)
+    const description = getItemDescription(item, lang)
+    const location = data.settings.location || ''
+
     ctx.fillStyle = '#faf9f7'
     ctx.fillRect(0, 0, width, height)
 
-    // Accent stripe
     ctx.fillStyle = '#e8927c'
     ctx.fillRect(0, 0, width, 8)
 
-    // Content area
     const padding = 60
     const contentWidth = width - padding * 2
 
-    // Title
     ctx.fillStyle = '#2d2926'
     ctx.font = 'bold 48px "DM Sans", sans-serif'
-    ctx.fillText(item.title[lang], padding, 100)
+    ctx.fillText(title, padding, 100)
 
-    // Price
     ctx.fillStyle = '#e8927c'
     ctx.font = 'bold 64px "DM Sans", sans-serif'
     ctx.fillText(`$${item.asking_price}`, padding, 180)
 
-    ctx.fillStyle = '#8a8480'
-    ctx.font = '32px "DM Sans", sans-serif'
-    ctx.fillText(`Original: $${item.original_price}`, padding + 200, 175)
-
-    // Description
-    ctx.fillStyle = '#2d2926'
-    ctx.font = '28px "DM Sans", sans-serif'
-    const desc = item.description[lang].slice(0, 150) + (item.description[lang].length > 150 ? '...' : '')
-    const words = desc.split(' ')
-    let line = ''
-    let y = 240
-    for (const word of words) {
-      const testLine = line + word + ' '
-      const metrics = ctx.measureText(testLine)
-      if (metrics.width > contentWidth) {
-        ctx.fillText(line, padding, y)
-        line = word + ' '
-        y += 36
-      } else {
-        line = testLine
-      }
+    if (item.original_price) {
+      ctx.fillStyle = '#8a8480'
+      ctx.font = '32px "DM Sans", sans-serif'
+      ctx.fillText(`Original: $${item.original_price}`, padding + 200, 175)
     }
-    ctx.fillText(line, padding, y)
 
-    // Branding
+    if (description) {
+      ctx.fillStyle = '#2d2926'
+      ctx.font = '28px "DM Sans", sans-serif'
+      const desc = description.slice(0, 150) + (description.length > 150 ? '...' : '')
+      const words = desc.split(' ')
+      let line = ''
+      let y = 240
+      for (const word of words) {
+        const testLine = line + word + ' '
+        const metrics = ctx.measureText(testLine)
+        if (metrics.width > contentWidth) {
+          ctx.fillText(line, padding, y)
+          line = word + ' '
+          y += 36
+        } else {
+          line = testLine
+        }
+      }
+      ctx.fillText(line, padding, y)
+    }
+
     ctx.fillStyle = '#8a8480'
     ctx.font = '24px "DM Sans", sans-serif'
     ctx.fillText('ResaleBox · 断舍离中心', padding, height - 40)
-    ctx.fillText(data.meta.location, width - padding - ctx.measureText(data.meta.location).width, height - 40)
+    if (location) {
+      ctx.fillText(location, width - padding - ctx.measureText(location).width, height - 40)
+    }
 
-    // Download
     const link = document.createElement('a')
-    link.download = `${item.title.en.toLowerCase().replace(/\s+/g, '-')}-share.png`
+    const filename = (item.title_en || item.title_zh || 'item')
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+    link.download = `${filename || 'item'}-share.png`
     link.href = canvas.toDataURL('image/png')
     link.click()
   }
@@ -212,7 +262,7 @@ DM me or contact: \`${data.meta.contact}\``
     <Dialog open={!!item} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t(labels.title)}: {t(item.title)}</DialogTitle>
+          <DialogTitle>{t(labels.title)}: {getItemTitle(item, lang)}</DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="xiaohongshu">
@@ -229,8 +279,8 @@ DM me or contact: \`${data.meta.contact}\``
               rows={12}
               className="font-mono text-sm"
             />
-            <Button 
-              onClick={() => handleCopy(xiaohongshuText)} 
+            <Button
+              onClick={() => handleCopy(xiaohongshuText)}
               className="w-full rounded-full"
             >
               {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
@@ -245,8 +295,8 @@ DM me or contact: \`${data.meta.contact}\``
               rows={12}
               className="font-mono text-sm"
             />
-            <Button 
-              onClick={() => handleCopy(facebookText)} 
+            <Button
+              onClick={() => handleCopy(facebookText)}
               className="w-full rounded-full"
             >
               {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
@@ -261,8 +311,8 @@ DM me or contact: \`${data.meta.contact}\``
               rows={8}
               className="font-mono text-sm"
             />
-            <Button 
-              onClick={() => handleCopy(discordText)} 
+            <Button
+              onClick={() => handleCopy(discordText)}
               className="w-full rounded-full"
             >
               {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
@@ -284,8 +334,8 @@ DM me or contact: \`${data.meta.contact}\``
                 <SelectItem value="story">{t(labels.story)}</SelectItem>
               </SelectContent>
             </Select>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={generateShareImage}
               className="flex-1 rounded-full"
             >

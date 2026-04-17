@@ -79,8 +79,46 @@ ${purchaseLink ? `商品链接 / Purchase link: ${purchaseLink}` : ''}
 ${notes ? `备注 / Notes: ${notes}` : ''}
 `.trim()
 
+    const jsonSchemaBlock = `{
+  "items": [
+    {
+      "title_zh": "中文标题",
+      "title_en": "English title",
+      "category": "furniture | electronics | clothing | kitchen | sports | books | other",
+      "condition": "${condition}",
+      "status": "available",
+      "original_price": 估算原价数字或 null,
+      "asking_price": ${askingPrice || '根据成色和市场价估算的数字'},
+      "description_zh": "中文描述（2-3句话）",
+      "description_en": "English description (2-3 sentences)",
+      "tags": ["相关标签", "最多5个"],
+      "images": [],
+      "bundle_id": null,
+      "featured": false,
+      "available_from": null,
+      "available_until": null,
+      "sell_priority": 5,
+      "allow_viewing": true,
+      "purchase_link": ${purchaseLink ? `"${purchaseLink}"` : 'null'},
+      "notes_zh": null,
+      "notes_en": null
+    }
+  ]
+}`
+
+    const commonRequirements = `要求 / Requirements:
+1. 输出必须是顶层带 "items" 数组的对象（即使只有一个物品），导入工具按此结构解析
+2. title_zh 必填；title_en / description_zh / description_en 可以为空字符串或有内容，不要写 null 字符串
+3. category 只能从这些里选：furniture, electronics, clothing, kitchen, sports, books, other
+4. condition 使用：like-new, good, fair, well-loved
+5. asking_price 和 original_price 必须是数字（或 original_price 为 null），不要带货币符号
+6. sell_priority 是 1-10 的数字，1 最急，10 最后卖；没特殊要求写 5
+7. tags 最多 5 个简短关键词
+8. images 留空数组 []，图片上传在管理后台另外做
+9. 标签/描述要突出品牌、型号、成色、尺寸等便于搜索的关键词`
+
     if (promptType === 'visual') {
-      return `你是一个二手物品销售助手。我正在准备出售一些物品，需要你帮我生成结构化的物品信息。
+      return `你是一个二手物品销售助手。我正在准备出售一些物品，需要你帮我生成结构化的物品信息，用于导入到我的二手商店后台。
 
 ${langInstructions}
 
@@ -88,30 +126,17 @@ ${langInstructions}
 
 ${itemInfo}
 
-请根据图片和提供的信息，输出以下 JSON 格式的数据：
+请根据图片和提供的信息，严格按以下 JSON Schema 输出（字段名必须完全一致）：
 
-{
-  "title": { "en": "英文标题", "zh": "中文标题" },
-  "category": "furniture | electronics | clothing | kitchen | sports | books | other (选择一个)",
-  "condition": "${condition}",
-  "original_price": 估算原价数字,
-  "asking_price": ${askingPrice || '根据成色和市场价估算'},
-  "description": { "en": "英文描述（2-3句话）", "zh": "中文描述（2-3句话）" },
-  "tags": ["相关标签", "最多5个"]
-}
+${jsonSchemaBlock}
 
-要求：
-1. 根据图片准确识别物品
-2. 标题要简洁明了，包含品牌和型号（如有）
-3. 描述要突出物品的优点和实际状况
-4. 标签要包含品牌、类型、用途等便于搜索的关键词
-5. 原价估算要合理，可参考商品链接或市场价
+${commonRequirements}
 
 请附上你的物品照片${purchaseLink ? '' : '（可以同时附上原商品链接）'}，然后发送！
 
-**请只输出有效的 JSON，不要添加任何解释文字。**`
+**只输出有效的 JSON，不要加任何 Markdown 代码块标记或解释文字。**`
     } else {
-      return `你是一个二手物品销售助手。我正在准备出售一些物品，需要你帮我生成结构化的物品信息。
+      return `你是一个二手物品销售助手。我正在准备出售一些物品，需要你帮我生成结构化的物品信息，用于导入到我的二手商店后台。
 
 ${langInstructions}
 
@@ -120,23 +145,11 @@ ${langInstructions}
 我提供的信息：
 ${itemInfo}
 
-请根据以上信息，输出以下 JSON 格式的数据：
+请根据以上信息，严格按以下 JSON Schema 输出（字段名必须完全一致）：
 
-{
-  "title": { "en": "英文标题", "zh": "中文标题" },
-  "category": "furniture | electronics | clothing | kitchen | sports | books | other (选择一个)",
-  "condition": "${condition}",
-  "original_price": 估算原价数字,
-  "asking_price": ${askingPrice || '根据成色和市场价估算'},
-  "description": { "en": "英文描述（2-3句话）", "zh": "中文描述（2-3句话）" },
-  "tags": ["相关标签", "最多5个"]
-}
+${jsonSchemaBlock}
 
-要求：
-1. 标题要简洁明了，包含品牌和型号（如有）
-2. 描述要突出物品的优点和实际状况
-3. 标签要包含品牌、类型、用途等便于搜索的关键词
-4. 原价估算要合理
+${commonRequirements}
 
 **在发送之前，请详细描述你的物品：**
 - 品牌和型号
@@ -144,7 +157,7 @@ ${itemInfo}
 - 购买时间和使用频率
 - 任何瑕疵或特殊情况
 
-**请只输出有效的 JSON，不要添加任何解释文字。**`
+**只输出有效的 JSON，不要加任何 Markdown 代码块标记或解释文字。**`
     }
   }
 

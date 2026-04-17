@@ -9,7 +9,7 @@ import { BundleSection } from './bundle-section'
 import { ItemDetailModal } from './item-detail-modal'
 import type { Category, Item } from '@/lib/types'
 
-type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'newest'
+type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'newest' | 'available-soonest'
 
 export function Storefront() {
   const { data, loading } = useApp()
@@ -67,6 +67,16 @@ export function Storefront() {
           const dateA = new Date(a.created_at || 0).getTime()
           const dateB = new Date(b.created_at || 0).getTime()
           return dateB - dateA
+        })
+        break
+      case 'available-soonest':
+        items.sort((a, b) => {
+          // Items with no `available_from` are treated as immediately available (timestamp 0)
+          const aTime = a.available_from ? new Date(a.available_from).getTime() : 0
+          const bTime = b.available_from ? new Date(b.available_from).getTime() : 0
+          if (aTime !== bTime) return aTime - bTime
+          // Tiebreaker: higher sell priority (lower number) first
+          return (a.sell_priority || 5) - (b.sell_priority || 5)
         })
         break
     }

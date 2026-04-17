@@ -1,17 +1,19 @@
 'use client'
 
-import { Gift } from 'lucide-react'
+import { Gift, Calendar, Flame } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useApp } from '@/lib/app-context'
-import { 
-  CATEGORY_LABELS, 
-  CATEGORY_ICONS, 
-  CONDITION_LABELS, 
+import {
+  CATEGORY_LABELS,
+  CATEGORY_ICONS,
+  CONDITION_LABELS,
   STATUS_LABELS,
   getItemTitle,
-  type Item 
+  getPriorityLabel,
+  getPriorityColor,
+  type Item
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -35,6 +37,22 @@ export function ItemCard({ item, onClick }: ItemCardProps) {
 
   const viewDetailsLabel = { en: 'View Details', zh: '查看详情' }
   const bundleAvailableLabel = { en: 'Bundle available', zh: '可打包' }
+
+  const availableFromDate = item.available_from ? new Date(item.available_from) : null
+  const availableUntilDate = item.available_until ? new Date(item.available_until) : null
+  const dateLocale = lang === 'zh' ? 'zh-CN' : 'en-US'
+  const dateOpts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  const availableLabel = (() => {
+    if (!availableFromDate && !availableUntilDate) return null
+    const fromStr = availableFromDate ? availableFromDate.toLocaleDateString(dateLocale, dateOpts) : (lang === 'zh' ? '即日起' : 'Now')
+    const untilStr = availableUntilDate ? availableUntilDate.toLocaleDateString(dateLocale, dateOpts) : null
+    return untilStr ? `${fromStr} – ${untilStr}` : fromStr
+  })()
+
+  // Only highlight priority if it's fairly urgent (<=4)
+  const showPriority = item.sell_priority && item.sell_priority <= 4
+  const priorityLabel = getPriorityLabel(item.sell_priority || 5)
+  const priorityColor = getPriorityColor(item.sell_priority || 5)
 
   return (
     <Card 
@@ -85,6 +103,19 @@ export function ItemCard({ item, onClick }: ItemCardProps) {
             {lang === 'zh' ? '推荐' : 'Featured'}
           </Badge>
         )}
+
+        {/* Urgent priority badge */}
+        {showPriority && !isSold && (
+          <Badge
+            className={cn(
+              'absolute bottom-2 right-2 border',
+              priorityColor
+            )}
+          >
+            <Flame className="h-3 w-3 mr-1" />
+            {priorityLabel[lang]}
+          </Badge>
+        )}
       </div>
       
       <CardContent className="p-4">
@@ -123,6 +154,12 @@ export function ItemCard({ item, onClick }: ItemCardProps) {
             <span className="inline-flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
               <Gift className="h-3 w-3" />
               {t(bundleAvailableLabel)}
+            </span>
+          )}
+          {availableLabel && (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              <Calendar className="h-3 w-3" />
+              {availableLabel}
             </span>
           )}
         </div>

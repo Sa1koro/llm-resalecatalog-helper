@@ -44,6 +44,7 @@ interface AppContextValue {
   deleteItem: (id: string) => Promise<void>
   duplicateItem: (id: string) => Promise<Item>
   updateItemStatus: (id: string, status: ItemStatus) => Promise<void>
+  reorderItems: (orderedIds: string[]) => Promise<void>
   
   // Bundles CRUD
   addBundle: (bundle: Omit<Bundle, 'id' | 'created_at' | 'updated_at'>) => Promise<Bundle>
@@ -325,6 +326,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await updateItem(id, { status })
   }, [updateItem])
 
+  // Reorder items: orderedIds must contain every item id exactly once
+  const reorderItems = useCallback(async (orderedIds: string[]) => {
+    // Optimistically reorder local state first
+    setData(prev => {
+      const byId = new Map(prev.items.map(item => [item.id, item]))
+      const newItems = orderedIds
+        .map((id, index) => {
+          const item = byId.get(id)
+          if (!item) return null
+          return { ...item, sort_order: index }
+        })
+        .filter((x): x is Item => x !== null)
+      return { ...prev, items: newItems }
+    })
+
+    // Persist each row's new sort_order. Parallel to minimize latency.
+    const now = new Date().toISOString()
+    await Promise.all(
+      orderedIds.map((id, index) =>
+        supabase
+          .from('items')
+          .update({ sort_order: index, updated_at: now })
+          .eq('id', id)
+      )
+    )
+  }, [supabase])
+
   // Bundle CRUD
   const addBundle = useCallback(async (bundle: Omit<Bundle, 'id' | 'created_at' | 'updated_at'>): Promise<Bundle> => {
     const { data: newBundle, error } = await supabase
@@ -421,6 +449,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteItem,
     duplicateItem,
     updateItemStatus,
+    reorderItems,
     addBundle,
     updateBundle,
     deleteBundle,

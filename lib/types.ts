@@ -122,6 +122,23 @@ export const STATUS_LABELS: Record<ItemStatus, BilingualText> = {
   sold: { en: 'Sold', zh: '已售出' },
 }
 
+// Sell priority 1-10 grouped into tiers for friendly display
+export function getPriorityLabel(priority: number): BilingualText {
+  if (priority <= 2) return { en: 'Sell ASAP', zh: '急售' }
+  if (priority <= 4) return { en: 'Sell Soon', zh: '尽快出' }
+  if (priority <= 6) return { en: 'No Rush', zh: '不急' }
+  if (priority <= 8) return { en: 'Later', zh: '稍后' }
+  return { en: 'Keep Until Moving', zh: '搬家前再卖' }
+}
+
+export function getPriorityColor(priority: number): string {
+  if (priority <= 2) return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-900/50'
+  if (priority <= 4) return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-900/50'
+  if (priority <= 6) return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900/50'
+  if (priority <= 8) return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700'
+  return 'bg-muted text-muted-foreground border-border'
+}
+
 export const CONTACT_PLATFORM_INFO: Record<ContactPlatform, { label: BilingualText; icon: string; urlPrefix?: string; copyable?: boolean }> = {
   wechat: { 
     label: { en: 'WeChat', zh: '微信' }, 

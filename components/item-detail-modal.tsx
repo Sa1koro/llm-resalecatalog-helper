@@ -31,16 +31,19 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useApp } from '@/lib/app-context'
 import { toast } from 'sonner'
-import { 
-  CATEGORY_LABELS, 
-  CATEGORY_ICONS, 
-  CONDITION_LABELS, 
+import {
+  CATEGORY_LABELS,
+  CATEGORY_ICONS,
+  CONDITION_LABELS,
   STATUS_LABELS,
   getItemTitle,
   getItemDescription,
   getBundleName,
-  type Item 
+  getPriorityLabel,
+  getPriorityColor,
+  type Item
 } from '@/lib/types'
+import { Flame, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ItemDetailModalProps {
@@ -77,7 +80,32 @@ export function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
     linkCopied: { en: 'Link copied!', zh: '链接已复制！' },
     textCopied: { en: 'Share text copied!', zh: '分享文案已复制！' },
     shareVia: { en: 'Share via', zh: '分享到' },
+    availability: { en: 'Availability', zh: '可取货时间' },
+    priority: { en: 'Sell Priority', zh: '出售优先级' },
+    availableNow: { en: 'Available Now', zh: '即日起可取' },
+    until: { en: 'until', zh: '截止' },
   }
+
+  const availableFromDate = item.available_from ? new Date(item.available_from) : null
+  const availableUntilDate = item.available_until ? new Date(item.available_until) : null
+  const dateLocale = lang === 'zh' ? 'zh-CN' : 'en-US'
+  const longDateOpts: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' }
+  const hasAvailability = availableFromDate || availableUntilDate
+  const availabilityText = (() => {
+    if (!hasAvailability) return t(labels.availableNow)
+    const fromStr = availableFromDate
+      ? availableFromDate.toLocaleDateString(dateLocale, longDateOpts)
+      : t(labels.availableNow)
+    const untilStr = availableUntilDate
+      ? availableUntilDate.toLocaleDateString(dateLocale, longDateOpts)
+      : null
+    return untilStr ? `${fromStr} — ${untilStr}` : fromStr
+  })()
+
+  const priority = item.sell_priority || 5
+  const priorityLabel = getPriorityLabel(priority)
+  const priorityColor = getPriorityColor(priority)
+  const showPriorityBadge = priority <= 4
 
   const getItemUrl = () => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
@@ -262,6 +290,26 @@ Link: ${getItemUrl()}`
                 {CATEGORY_ICONS[item.category]} {t(CATEGORY_LABELS[item.category])}
               </span>
             </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase mb-1">
+                {t(labels.availability)}
+              </p>
+              <span className="inline-flex items-center gap-1.5 text-sm">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                {availabilityText}
+              </span>
+            </div>
+            {showPriorityBadge && (
+              <div>
+                <p className="text-xs text-muted-foreground uppercase mb-1">
+                  {t(labels.priority)}
+                </p>
+                <Badge className={cn('border', priorityColor)}>
+                  <Flame className="h-3 w-3 mr-1" />
+                  {priorityLabel[lang]}
+                </Badge>
+              </div>
+            )}
           </div>
           
           {/* Tags */}
