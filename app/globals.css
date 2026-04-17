@@ -153,6 +153,14 @@
   }
 }
 
+/* Container with responsive max-width */
+@layer components {
+  .container {
+    @apply w-full px-4 mx-auto;
+    max-width: 1600px;
+  }
+}
+
 /* Custom shadow with warm tint */
 .shadow-warm {
   box-shadow: 0 2px 12px oklch(0.2 0.02 60 / 0.08);
