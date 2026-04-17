@@ -30,6 +30,8 @@ export function PromptTool() {
   const [itemName, setItemName] = useState('')
   const [condition, setCondition] = useState<Condition>('good')
   const [askingPrice, setAskingPrice] = useState('')
+  const [availableFrom, setAvailableFrom] = useState('')
+  const [availableUntil, setAvailableUntil] = useState('')
   const [purchaseLink, setPurchaseLink] = useState('')
   const [notes, setNotes] = useState('')
   const [promptLang, setPromptLang] = useState<PromptLanguage>('bilingual')
@@ -47,6 +49,8 @@ export function PromptTool() {
     itemNamePlaceholder: { en: 'e.g., IKEA desk lamp', zh: '例如：宜家台灯' },
     condition: { en: 'Condition', zh: '成色' },
     askingPrice: { en: 'Asking price (CAD)', zh: '售价（加元）' },
+    availableFrom: { en: 'Available from (optional)', zh: '可取货开始日期（可选）' },
+    availableUntil: { en: 'Available until (optional)', zh: '可取货截止日期（可选）' },
     purchaseLink: { en: 'Purchase link (optional)', zh: '商品链接（可选）' },
     notes: { en: 'Additional notes', zh: '额外备注' },
     notesPlaceholder: { en: 'e.g., has a small scratch on base', zh: '例如：底座有轻微划痕' },
@@ -75,6 +79,8 @@ export function PromptTool() {
 ${itemName ? `物品名称提示 / Item name hint: ${itemName}` : ''}
 成色 / Condition: ${CONDITION_LABELS[condition].en} / ${CONDITION_LABELS[condition].zh}
 ${askingPrice ? `售价 / Asking price: CAD $${askingPrice}` : ''}
+${availableFrom ? `可取货开始日期 / Available from: ${availableFrom}` : ''}
+${availableUntil ? `可取货截止日期 / Available until: ${availableUntil}` : ''}
 ${purchaseLink ? `商品链接 / Purchase link: ${purchaseLink}` : ''}
 ${notes ? `备注 / Notes: ${notes}` : ''}
 `.trim()
@@ -95,8 +101,8 @@ ${notes ? `备注 / Notes: ${notes}` : ''}
       "images": [],
       "bundle_id": null,
       "featured": false,
-      "available_from": null,
-      "available_until": null,
+      "available_from": ${availableFrom ? `"${availableFrom}"` : 'null'},
+      "available_until": ${availableUntil ? `"${availableUntil}"` : 'null'},
       "sell_priority": 5,
       "allow_viewing": true,
       "purchase_link": ${purchaseLink ? `"${purchaseLink}"` : 'null'},
@@ -250,6 +256,25 @@ ${commonRequirements}
                   <SelectItem value="en">{t(labels.english)}</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>{t(labels.availableFrom)}</Label>
+              <Input
+                type="date"
+                value={availableFrom}
+                onChange={(e) => setAvailableFrom(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t(labels.availableUntil)}</Label>
+              <Input
+                type="date"
+                value={availableUntil}
+                onChange={(e) => setAvailableUntil(e.target.value)}
+              />
             </div>
           </div>
           

@@ -82,6 +82,7 @@ export function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
     shareVia: { en: 'Share via', zh: '分享到' },
     availability: { en: 'Availability', zh: '可取货时间' },
     priority: { en: 'Sell Priority', zh: '出售优先级' },
+    originalListing: { en: 'Original listing', zh: '原始商品链接' },
     availableNow: { en: 'Available Now', zh: '即日起可取' },
     until: { en: 'until', zh: '截止' },
   }
@@ -123,6 +124,7 @@ export function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
 售价: ${price}${item.original_price ? ` (原价 ¥${item.original_price})` : ''}
 成色: ${condition}
 ${description ? `\n${description}\n` : ''}
+${item.purchase_link ? `原始链接: ${item.purchase_link}\n` : ''}
 链接: ${getItemUrl()}`
     }
     
@@ -130,6 +132,7 @@ ${description ? `\n${description}\n` : ''}
 Price: ${price}${item.original_price ? ` (was ¥${item.original_price})` : ''}
 Condition: ${condition}
 ${description ? `\n${description}\n` : ''}
+${item.purchase_link ? `Original listing: ${item.purchase_link}\n` : ''}
 Link: ${getItemUrl()}`
   }
 
@@ -311,6 +314,23 @@ Link: ${getItemUrl()}`
               </div>
             )}
           </div>
+
+          {item.purchase_link && (
+            <div className="mb-6">
+              <p className="text-xs text-muted-foreground uppercase mb-2">
+                {t(labels.originalListing)}
+              </p>
+              <a
+                href={item.purchase_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline break-all"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {item.purchase_link}
+              </a>
+            </div>
+          )}
           
           {/* Tags */}
           {item.tags && item.tags.length > 0 && (

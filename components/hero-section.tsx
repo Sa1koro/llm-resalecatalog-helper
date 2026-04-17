@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo } from 'react'
-import { MapPin, Calendar, MessageCircle, Phone, BookOpen, ExternalLink, Copy } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { MapPin, Calendar, MessageCircle, Phone, BookOpen, ExternalLink, Copy, Download } from 'lucide-react'
 import { Logo } from './logo'
 import { useApp } from '@/lib/app-context'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CONTACT_PLATFORM_INFO, type ContactPlatform } from '@/lib/types'
 import { toast } from 'sonner'
 
@@ -45,7 +46,11 @@ function ContactIcon({ platform }: { platform: ContactPlatform }) {
   }
 }
 
-function getContactUrl(platform: ContactPlatform, value: string): string | null {
+function getContactUrl(contact: { platform: ContactPlatform; value: string; link?: string | null }): string | null {
+  // Explicit custom link should always win over inferred platform URL.
+  if (contact.link && contact.link.startsWith('http')) return contact.link
+
+  const { platform, value } = contact
   const info = CONTACT_PLATFORM_INFO[platform]
   if (info.copyable) return null
   
@@ -66,6 +71,8 @@ function getContactUrl(platform: ContactPlatform, value: string): string | null 
 export function HeroSection() {
   const { data, lang, t, loading } = useApp()
   const { settings, contactMethods } = data
+  const [qrPreviewUrl, setQrPreviewUrl] = useState<string | null>(null)
+  const [qrPreviewLabel, setQrPreviewLabel] = useState('')
 
   const daysUntilMoving = useMemo(() => {
     if (!settings.moving_date) return null
@@ -79,7 +86,7 @@ export function HeroSection() {
   const enabledContacts = contactMethods.filter(c => c.enabled)
 
   const handleContactClick = (contact: typeof contactMethods[0]) => {
-    const url = getContactUrl(contact.platform, contact.value)
+    const url = getContactUrl(contact)
     
     if (url) {
       window.open(url, '_blank', 'noopener,noreferrer')
@@ -87,6 +94,14 @@ export function HeroSection() {
       // Copy to clipboard
       navigator.clipboard.writeText(contact.value)
       toast.success(lang === 'zh' ? `已复制: ${contact.value}` : `Copied: ${contact.value}`)
+
+      // For QR-based platforms, show QR preview after copying.
+      const isQrPlatform = ['wechat', 'qq', 'xiaohongshu'].includes(contact.platform)
+      if (isQrPlatform && contact.qr_code_url) {
+        const info = CONTACT_PLATFORM_INFO[contact.platform]
+        setQrPreviewLabel(contact.label || t(info.label))
+        setQrPreviewUrl(contact.qr_code_url)
+      }
     }
   }
 
@@ -170,7 +185,7 @@ export function HeroSection() {
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   {enabledContacts.map((contact) => {
                     const info = CONTACT_PLATFORM_INFO[contact.platform]
-                    const url = getContactUrl(contact.platform, contact.value)
+                    const url = getContactUrl(contact)
                     const isCopyable = !url
                     
                     return (
@@ -210,6 +225,29 @@ export function HeroSection() {
           )}
         </div>
       </div>
+
+      <Dialog open={!!qrPreviewUrl} onOpenChange={(open) => !open && setQrPreviewUrl(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{lang === 'zh' ? `扫码联系 · ${qrPreviewLabel}` : `Scan to contact · ${qrPreviewLabel}`}</DialogTitle>
+          </DialogHeader>
+          {qrPreviewUrl && (
+            <div className="space-y-3">
+              <img
+                src={qrPreviewUrl}
+                alt={qrPreviewLabel}
+                className="w-full rounded-md border"
+              />
+              <Button asChild className="w-full rounded-full" variant="outline">
+                <a href={qrPreviewUrl} download={`${qrPreviewLabel || 'contact'}-qrcode.png`}>
+                  <Download className="h-4 w-4 mr-2" />
+                  {lang === 'zh' ? '保存二维码' : 'Save QR code'}
+                </a>
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

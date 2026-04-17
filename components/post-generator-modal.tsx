@@ -50,6 +50,27 @@ function getPrimaryContactLine(methods: ContactMethod[], lang: 'zh' | 'en'): str
   return enabled.slice(0, 2).map(m => formatContactMethod(m, lang)).join(' / ')
 }
 
+function wrapCanvasText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+): string[] {
+  // Works for both CJK and Latin by measuring character-by-character
+  const lines: string[] = []
+  let current = ''
+  for (const ch of text) {
+    const test = current + ch
+    if (ctx.measureText(test).width <= maxWidth) {
+      current = test
+      continue
+    }
+    if (current) lines.push(current)
+    current = ch
+  }
+  if (current) lines.push(current)
+  return lines
+}
+
 export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
   const { data, t, lang } = useApp()
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -89,6 +110,7 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
     const descriptionEn = item.description_en || item.description_zh || ''
     const notesZh = item.notes_zh || ''
     const notesEn = item.notes_en || item.notes_zh || ''
+    const purchaseLink = item.purchase_link || ''
 
     const location = data.settings.location || ''
     const contactsZh = getPrimaryContactLine(data.contactMethods, 'zh')
@@ -118,6 +140,7 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
       descriptionZh,
       '',
       notesZh ? `📝 备注：${notesZh}` : '',
+      purchaseLink ? `🔗 原始购买链接：${purchaseLink}` : '',
       `💬 联系方式：${contactsZh}`,
       '',
       `#多伦多二手 #北约克二手 #搬家清仓 #${CATEGORY_LABELS[item.category].zh} ${item.tags?.map(tag => `#${tag}`).join(' ') || ''}`,
@@ -141,6 +164,7 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
       descriptionEn,
       '',
       notesEn ? `Note: ${notesEn}` : '',
+      purchaseLink ? `🔗 Original listing: ${purchaseLink}` : '',
       `💬 Contact: ${contactsEn}`,
       '',
       `#MovingSale #SecondHand #Toronto #NorthYork #${item.category}`,
@@ -166,6 +190,7 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
       `${conditionStars} ${CONDITION_LABELS[item.condition].en}`,
       location ? `📍 ${location}` : '',
       item.allow_viewing ? '👀 Viewable' : '',
+      purchaseLink ? `🔗 ${purchaseLink}` : '',
       '',
       `DM me or contact: \`${contactsEn}\``,
     ].filter(Boolean).join('\n')
@@ -222,21 +247,15 @@ export function PostGeneratorModal({ item, onClose }: PostGeneratorModalProps) {
       ctx.fillStyle = '#2d2926'
       ctx.font = '28px "DM Sans", sans-serif'
       const desc = description.slice(0, 150) + (description.length > 150 ? '...' : '')
-      const words = desc.split(' ')
-      let line = ''
+      const lines = wrapCanvasText(ctx, desc, contentWidth)
+      const maxLines = imageSize === 'story' ? 10 : 4
       let y = 240
-      for (const word of words) {
-        const testLine = line + word + ' '
-        const metrics = ctx.measureText(testLine)
-        if (metrics.width > contentWidth) {
-          ctx.fillText(line, padding, y)
-          line = word + ' '
-          y += 36
-        } else {
-          line = testLine
-        }
+      for (let i = 0; i < Math.min(lines.length, maxLines); i += 1) {
+        const isLastVisible = i === maxLines - 1 && lines.length > maxLines
+        const text = isLastVisible ? `${lines[i]}...` : lines[i]
+        ctx.fillText(text, padding, y)
+        y += 36
       }
-      ctx.fillText(line, padding, y)
     }
 
     ctx.fillStyle = '#8a8480'
