@@ -1,151 +1,133 @@
--- =========================================================================
--- Security hardening migration
---
--- What this does:
---   1. Enables pgcrypto (provides bcrypt-compatible crypt()/gen_salt('bf'))
---   2. Creates a single-row admin_auth table with a bcrypt password_hash
---   3. Migrates any existing plaintext settings.admin_password into it
---   4. Drops the plaintext admin_password column from settings
---   5. Enables RLS on all public tables
---   6. Grants anon/authenticated roles SELECT-only access on public data
---   7. Adds two server-only RPC helpers for password verify / update
---
--- After this migration:
---   - The anon key (shipped to the browser) can ONLY read public catalog data.
---   - It CANNOT read admin_auth, CANNOT insert/update/delete anything.
---   - All writes must go through /api/admin/* routes using the
---     SUPABASE_SERVICE_ROLE_KEY on the server.
--- =========================================================================
+-- =============================================================
+-- ResaleBox security hardening (idempotent, safe to re-run)
+-- =============================================================
+-- What this script does:
+--   1. Enable the pgcrypto extension (for bcrypt via crypt()).
+--   2. Create a dedicated `admin_auth` table holding a bcrypt
+--      password hash. One row, id = 1.
+--   3. If the old plaintext `settings.admin_password` column
+--      still exists, migrate its value into admin_auth as a
+--      bcrypt hash, then DROP the column. If no plaintext value
+--      is available, seed with the default 'resale2026'.
+--   4. Enable Row Level Security on all public tables.
+--   5. Add SELECT-only policies for anon / authenticated so the
+--      storefront can still read the catalog with the anon key,
+--      but CANNOT insert/update/delete anything. All writes
+--      must now go through the service-role key on the server.
+--   6. Provide two SECURITY DEFINER RPCs
+--      (verify_admin_password, set_admin_password) and revoke
+--      their EXECUTE privilege from anon/authenticated so only
+--      the service role can call them.
+-- =============================================================
 
+-- 1. pgcrypto
 create extension if not exists pgcrypto;
 
--- -------------------------------------------------------------------------
--- 1. admin_auth: single-row table holding the bcrypt-hashed admin password
--- -------------------------------------------------------------------------
+-- 2. admin_auth table ----------------------------------------------------
 create table if not exists public.admin_auth (
-  id integer primary key default 1,
+  id           integer primary key check (id = 1),
   password_hash text not null,
-  updated_at timestamptz not null default now(),
-  constraint admin_auth_single_row check (id = 1)
+  updated_at    timestamptz not null default now()
 );
 
--- -------------------------------------------------------------------------
--- 2. Migrate current plaintext password (if any) into admin_auth as bcrypt.
---    Fallback to the original default 'resale2026' if the settings row is
---    empty or the column no longer exists.
--- -------------------------------------------------------------------------
+-- 3. Migrate any existing plaintext password and drop the column ---------
 do $$
 declare
-  existing_password text := null;
-  has_column boolean;
+  has_col   boolean;
+  old_pw    text;
 begin
   select exists (
-    select 1
-    from information_schema.columns
+    select 1 from information_schema.columns
     where table_schema = 'public'
-      and table_name = 'settings'
-      and column_name = 'admin_password'
-  ) into has_column;
+      and table_name   = 'settings'
+      and column_name  = 'admin_password'
+  ) into has_col;
 
-  if has_column then
-    execute 'select admin_password from public.settings where admin_password is not null and admin_password <> '''' limit 1'
-      into existing_password;
+  if has_col then
+    execute 'select admin_password from public.settings limit 1' into old_pw;
   end if;
 
-  if existing_password is null then
-    existing_password := 'resale2026';
+  -- If admin_auth is empty, seed it
+  if not exists (select 1 from public.admin_auth where id = 1) then
+    insert into public.admin_auth (id, password_hash)
+    values (1, crypt(coalesce(nullif(old_pw, ''), 'resale2026'), gen_salt('bf', 10)));
   end if;
 
-  insert into public.admin_auth (id, password_hash)
-  values (1, crypt(existing_password, gen_salt('bf', 10)))
-  on conflict (id) do nothing;
+  -- Drop the plaintext column if it still exists
+  if has_col then
+    execute 'alter table public.settings drop column admin_password';
+  end if;
 end $$;
 
--- -------------------------------------------------------------------------
--- 3. Drop plaintext column so it can never be read by the browser again
--- -------------------------------------------------------------------------
-alter table public.settings drop column if exists admin_password;
+-- 4. Enable RLS on all public tables -------------------------------------
+alter table public.settings         enable row level security;
+alter table public.contact_methods  enable row level security;
+alter table public.items            enable row level security;
+alter table public.bundles          enable row level security;
+alter table public.admin_auth       enable row level security;
 
--- -------------------------------------------------------------------------
--- 4. Enable Row Level Security on every public table
--- -------------------------------------------------------------------------
-alter table public.settings          enable row level security;
-alter table public.contact_methods   enable row level security;
-alter table public.items             enable row level security;
-alter table public.bundles           enable row level security;
-alter table public.admin_auth        enable row level security;
+-- 5. Public-read policies (drop & recreate so the script is idempotent) --
+drop policy if exists "public_read_settings"        on public.settings;
+drop policy if exists "public_read_contact_methods" on public.contact_methods;
+drop policy if exists "public_read_items"           on public.items;
+drop policy if exists "public_read_bundles"         on public.bundles;
 
--- -------------------------------------------------------------------------
--- 5. Policies: anon + authenticated can SELECT public catalog data only.
---    No INSERT/UPDATE/DELETE policies -> writes are blocked for these roles.
---    admin_auth has NO policies -> completely invisible to anon.
---    The service_role key bypasses RLS, so server API routes still work.
--- -------------------------------------------------------------------------
-drop policy if exists "Public read settings"         on public.settings;
-drop policy if exists "Public read contact_methods"  on public.contact_methods;
-drop policy if exists "Public read items"            on public.items;
-drop policy if exists "Public read bundles"          on public.bundles;
-
-create policy "Public read settings"
+create policy "public_read_settings"
   on public.settings for select
   to anon, authenticated
   using (true);
 
-create policy "Public read contact_methods"
+create policy "public_read_contact_methods"
   on public.contact_methods for select
   to anon, authenticated
   using (true);
 
-create policy "Public read items"
+create policy "public_read_items"
   on public.items for select
   to anon, authenticated
   using (true);
 
-create policy "Public read bundles"
+create policy "public_read_bundles"
   on public.bundles for select
   to anon, authenticated
   using (true);
 
--- -------------------------------------------------------------------------
--- 6. Server-only RPC helpers (service_role still bypasses RLS/grants,
---    but we REVOKE from anon/authenticated as defense in depth)
--- -------------------------------------------------------------------------
-create or replace function public.verify_admin_password(input_password text)
+-- Note: admin_auth has RLS ON and NO policies -> anon/authenticated
+-- cannot access it at all. The service role bypasses RLS, so the
+-- server can still read/write it.
+
+-- 6. RPC helpers for password verification/rotation ----------------------
+create or replace function public.verify_admin_password(pw text)
 returns boolean
 language sql
-stable
+security definer
+set search_path = public
 as $$
   select exists (
     select 1
     from public.admin_auth
     where id = 1
-      and crypt(input_password, password_hash) = password_hash
+      and password_hash = crypt(pw, password_hash)
   );
 $$;
 
-create or replace function public.set_admin_password(new_password text)
+create or replace function public.set_admin_password(pw text)
 returns void
-language plpgsql
+language sql
+security definer
+set search_path = public
 as $$
-declare
-  new_hash text;
-begin
-  if new_password is null or length(new_password) < 6 then
-    raise exception 'password too short';
-  end if;
-
-  new_hash := crypt(new_password, gen_salt('bf', 10));
-
-  insert into public.admin_auth (id, password_hash)
-  values (1, new_hash)
+  insert into public.admin_auth (id, password_hash, updated_at)
+  values (1, crypt(pw, gen_salt('bf', 10)), now())
   on conflict (id) do update
-    set password_hash = new_hash,
-        updated_at   = now();
-end;
+    set password_hash = excluded.password_hash,
+        updated_at    = now();
 $$;
 
+-- Lock down execution: only service role can call these
 revoke all on function public.verify_admin_password(text) from public;
-revoke all on function public.verify_admin_password(text) from anon, authenticated;
-
-revoke all on function public.set_admin_password(text) from public;
-revoke all on function public.set_admin_password(text) from anon, authenticated;
+revoke all on function public.set_admin_password(text)    from public;
+revoke execute on function public.verify_admin_password(text) from anon, authenticated;
+revoke execute on function public.set_admin_password(text)    from anon, authenticated;
+grant  execute on function public.verify_admin_password(text) to service_role;
+grant  execute on function public.set_admin_password(text)    to service_role;
