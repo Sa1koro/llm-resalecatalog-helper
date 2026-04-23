@@ -69,8 +69,8 @@ interface AppContextValue {
   
   // Auth
   isAuthenticated: boolean
-  authenticate: (password: string) => boolean
-  logout: () => void
+  authenticate: (password: string) => Promise<boolean>
+  logout: () => Promise<void>
   
   // Helpers
   getItemById: (id: string) => Item | undefined
@@ -94,6 +94,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const supabase = createClient()
 
+  const adminRequest = useCallback(async <T,>(path: string, init: RequestInit = {}): Promise<T> => {
+    const response = await fetch(path, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init.headers || {}),
+      },
+    })
+
+    let payload: any = null
+    try {
+      payload = await response.json()
+    } catch {
+      payload = null
+    }
+
+    if (response.status === 401) {
+      setIsAuthenticated(false)
+    }
+
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Request failed')
+    }
+
+    return (payload?.data ?? payload) as T
+  }, [])
+
   // Fetch all data from Supabase
   const refreshData = useCallback(async () => {
     try {
@@ -107,16 +134,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('bundles').select('*').order('sort_order'),
       ])
 
-      // If no settings exist, create default
-      let settings = settingsRes.data
-      if (!settings) {
-        const { data: newSettings } = await supabase
-          .from('settings')
-          .insert([{ seller_name: 'ResaleBox', admin_password: 'resale2026' }])
-          .select()
-          .single()
-        settings = newSettings
-      }
+      const settings = settingsRes.data
 
       setData({
         settings: settings ? { ...DEFAULT_SETTINGS, ...settings } : DEFAULT_SETTINGS,
@@ -136,6 +154,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refreshData()
   }, [refreshData])
+
+  useEffect(() => {
+    let mounted = true
+    const checkSession = async () => {
+      try {
+        const response = await fetch('/api/admin/session', { cache: 'no-store' })
+        if (!response.ok) return
+        const payload = await response.json()
+        if (mounted) {
+          setIsAuthenticated(Boolean(payload?.authenticated))
+        }
+      } catch {
+        if (mounted) {
+          setIsAuthenticated(false)
+        }
+      }
+    }
+
+    checkSession()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   // Handle hash-based routing
   useEffect(() => {
@@ -188,125 +229,118 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [lang])
 
   // Auth
-  const authenticate = useCallback((password: string) => {
-    if (password === data.settings.admin_password) {
+  const authenticate = useCallback(async (password: string) => {
+    try {
+      await adminRequest('/api/admin/login', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      })
       setIsAuthenticated(true)
       return true
+    } catch {
+      setIsAuthenticated(false)
+      return false
     }
-    return false
-  }, [data.settings.admin_password])
+  }, [adminRequest])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await adminRequest('/api/admin/logout', { method: 'POST' })
+    } catch {
+      // Even if logout API fails, clear local auth state.
+    }
     setIsAuthenticated(false)
     setRoute('shop')
-  }, [setRoute])
+  }, [adminRequest, setRoute])
 
   // Settings
   const updateSettings = useCallback(async (updates: Partial<Settings>) => {
-    const { error } = await supabase
-      .from('settings')
-      .update(updates)
-      .eq('id', data.settings.id)
-    
-    if (!error) {
-      setData(prev => ({
-        ...prev,
-        settings: { ...prev.settings, ...updates }
-      }))
-    }
-  }, [supabase, data.settings.id])
+    const updatedSettings = await adminRequest<Settings>('/api/admin/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ id: data.settings.id, ...updates }),
+    })
+
+    setData(prev => ({
+      ...prev,
+      settings: { ...prev.settings, ...updatedSettings },
+    }))
+  }, [adminRequest, data.settings.id])
 
   // Contact Methods
   const addContactMethod = useCallback(async (method: Omit<ContactMethod, 'id'>) => {
-    const { data: newMethod, error } = await supabase
-      .from('contact_methods')
-      .insert([method])
-      .select()
-      .single()
-    
-    if (!error && newMethod) {
-      setData(prev => ({
-        ...prev,
-        contactMethods: [...prev.contactMethods, newMethod]
-      }))
-    }
-  }, [supabase])
+    const newMethod = await adminRequest<ContactMethod>('/api/admin/contact-methods', {
+      method: 'POST',
+      body: JSON.stringify(method),
+    })
+
+    setData(prev => ({
+      ...prev,
+      contactMethods: [...prev.contactMethods, newMethod],
+    }))
+  }, [adminRequest])
 
   const updateContactMethod = useCallback(async (id: string, updates: Partial<ContactMethod>) => {
-    const { error } = await supabase
-      .from('contact_methods')
-      .update(updates)
-      .eq('id', id)
-    
-    if (!error) {
-      setData(prev => ({
-        ...prev,
-        contactMethods: prev.contactMethods.map(m => m.id === id ? { ...m, ...updates } : m)
-      }))
-    }
-  }, [supabase])
+    const updatedMethod = await adminRequest<ContactMethod>(`/api/admin/contact-methods/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    })
+
+    setData(prev => ({
+      ...prev,
+      contactMethods: prev.contactMethods.map(m => (m.id === id ? { ...m, ...updatedMethod } : m)),
+    }))
+  }, [adminRequest])
 
   const deleteContactMethod = useCallback(async (id: string) => {
-    const { error } = await supabase
-      .from('contact_methods')
-      .delete()
-      .eq('id', id)
-    
-    if (!error) {
-      setData(prev => ({
-        ...prev,
-        contactMethods: prev.contactMethods.filter(m => m.id !== id)
-      }))
-    }
-  }, [supabase])
+    await adminRequest(`/api/admin/contact-methods/${id}`, {
+      method: 'DELETE',
+    })
+
+    setData(prev => ({
+      ...prev,
+      contactMethods: prev.contactMethods.filter(m => m.id !== id),
+    }))
+  }, [adminRequest])
 
   // Item CRUD
   const addItem = useCallback(async (item: Omit<Item, 'id' | 'created_at' | 'updated_at'>): Promise<Item> => {
-    const { data: newItem, error } = await supabase
-      .from('items')
-      .insert([item])
-      .select()
-      .single()
-    
-    if (error) throw error
-    
+    const newItem = await adminRequest<Item>('/api/admin/items', {
+      method: 'POST',
+      body: JSON.stringify(item),
+    })
+
     setData(prev => ({
       ...prev,
-      items: [...prev.items, newItem]
+      items: [...prev.items, newItem],
     }))
-    
+
     return newItem
-  }, [supabase])
+  }, [adminRequest])
 
   const updateItem = useCallback(async (id: string, updates: Partial<Item>) => {
-    const { error } = await supabase
-      .from('items')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-    
-    if (!error) {
-      setData(prev => ({
-        ...prev,
-        items: prev.items.map(item => 
-          item.id === id ? { ...item, ...updates } : item
-        )
-      }))
-    }
-  }, [supabase])
+    const updatedItem = await adminRequest<Item>(`/api/admin/items/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...updates, updated_at: new Date().toISOString() }),
+    })
+
+    setData(prev => ({
+      ...prev,
+      items: prev.items.map(item =>
+        item.id === id ? { ...item, ...updatedItem } : item
+      ),
+    }))
+  }, [adminRequest])
 
   const deleteItem = useCallback(async (id: string) => {
-    const { error } = await supabase
-      .from('items')
-      .delete()
-      .eq('id', id)
-    
-    if (!error) {
-      setData(prev => ({
-        ...prev,
-        items: prev.items.filter(item => item.id !== id)
-      }))
-    }
-  }, [supabase])
+    await adminRequest(`/api/admin/items/${id}`, {
+      method: 'DELETE',
+    })
+
+    setData(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== id),
+    }))
+  }, [adminRequest])
 
   const duplicateItem = useCallback(async (id: string): Promise<Item> => {
     const original = data.items.find(item => item.id === id)
@@ -346,70 +380,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const now = new Date().toISOString()
     await Promise.all(
       orderedIds.map((id, index) =>
-        supabase
-          .from('items')
-          .update({ sort_order: index, updated_at: now })
-          .eq('id', id)
+        adminRequest(`/api/admin/items/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ sort_order: index, updated_at: now }),
+        })
       )
     )
-  }, [supabase])
+  }, [adminRequest])
 
   // Bundle CRUD
   const addBundle = useCallback(async (bundle: Omit<Bundle, 'id' | 'created_at' | 'updated_at'>): Promise<Bundle> => {
-    const { data: newBundle, error } = await supabase
-      .from('bundles')
-      .insert([bundle])
-      .select()
-      .single()
-    
-    if (error) throw error
-    
+    const newBundle = await adminRequest<Bundle>('/api/admin/bundles', {
+      method: 'POST',
+      body: JSON.stringify(bundle),
+    })
+
     setData(prev => ({
       ...prev,
-      bundles: [...prev.bundles, newBundle]
+      bundles: [...prev.bundles, newBundle],
     }))
-    
+
     return newBundle
-  }, [supabase])
+  }, [adminRequest])
 
   const updateBundle = useCallback(async (id: string, updates: Partial<Bundle>) => {
-    const { error } = await supabase
-      .from('bundles')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-    
-    if (!error) {
-      setData(prev => ({
-        ...prev,
-        bundles: prev.bundles.map(bundle =>
-          bundle.id === id ? { ...bundle, ...updates } : bundle
-        )
-      }))
-    }
-  }, [supabase])
+    const updatedBundle = await adminRequest<Bundle>(`/api/admin/bundles/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...updates, updated_at: new Date().toISOString() }),
+    })
+
+    setData(prev => ({
+      ...prev,
+      bundles: prev.bundles.map(bundle =>
+        bundle.id === id ? { ...bundle, ...updatedBundle } : bundle
+      ),
+    }))
+  }, [adminRequest])
 
   const deleteBundle = useCallback(async (id: string) => {
-    // First, unlink all items from this bundle
-    await supabase
-      .from('items')
-      .update({ bundle_id: null })
-      .eq('bundle_id', id)
-    
-    const { error } = await supabase
-      .from('bundles')
-      .delete()
-      .eq('id', id)
-    
-    if (!error) {
-      setData(prev => ({
-        ...prev,
-        bundles: prev.bundles.filter(bundle => bundle.id !== id),
-        items: prev.items.map(item => 
-          item.bundle_id === id ? { ...item, bundle_id: null } : item
-        )
-      }))
-    }
-  }, [supabase])
+    await adminRequest(`/api/admin/bundles/${id}`, {
+      method: 'DELETE',
+    })
+
+    setData(prev => ({
+      ...prev,
+      bundles: prev.bundles.filter(bundle => bundle.id !== id),
+      items: prev.items.map(item =>
+        item.bundle_id === id ? { ...item, bundle_id: null } : item
+      ),
+    }))
+  }, [adminRequest])
 
   // Helpers
   const getItemById = useCallback((id: string) => {

@@ -24,6 +24,7 @@ export function AdminPanel() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [postGeneratorItem, setPostGeneratorItem] = useState<Item | null>(null)
   const [activeTab, setActiveTab] = useState('items')
+  const [loggingIn, setLoggingIn] = useState(false)
 
   const labels = {
     title: { en: 'Admin Panel', zh: '管理后台' },
@@ -44,13 +45,16 @@ export function AdminPanel() {
     settings: { en: 'Settings', zh: '设置' },
   }
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (authenticate(password)) {
+    setLoggingIn(true)
+    const success = await authenticate(password)
+    if (success) {
       setError(false)
     } else {
       setError(true)
     }
+    setLoggingIn(false)
   }
 
   const handleExport = () => {
@@ -104,8 +108,8 @@ export function AdminPanel() {
               {error && (
                 <p className="text-sm text-destructive">{t(labels.wrongPassword)}</p>
               )}
-              <Button type="submit" className="w-full rounded-full">
-                {t(labels.login)}
+              <Button type="submit" className="w-full rounded-full" disabled={loggingIn}>
+                {loggingIn ? (lang === 'zh' ? '登录中...' : 'Signing in...') : t(labels.login)}
               </Button>
             </form>
           </CardContent>

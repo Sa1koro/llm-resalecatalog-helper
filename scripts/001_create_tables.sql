@@ -72,11 +72,11 @@ CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
 CREATE INDEX IF NOT EXISTS idx_items_bundle_id ON items(bundle_id);
 CREATE INDEX IF NOT EXISTS idx_items_featured ON items(featured);
 
--- Disable RLS since this is a single-user public app
-ALTER TABLE settings DISABLE ROW LEVEL SECURITY;
-ALTER TABLE contact_methods DISABLE ROW LEVEL SECURITY;
-ALTER TABLE items DISABLE ROW LEVEL SECURITY;
-ALTER TABLE bundles DISABLE ROW LEVEL SECURITY;
+-- Keep RLS enabled; policies are managed in separate migration scripts
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contact_methods ENABLE ROW LEVEL SECURITY;
+ALTER TABLE items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bundles ENABLE ROW LEVEL SECURITY;
 
 -- Insert default settings
 INSERT INTO settings (seller_name, location, moving_date, admin_password, currency)

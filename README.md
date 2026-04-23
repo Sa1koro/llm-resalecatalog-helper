@@ -24,6 +24,24 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Supabase Security Setup
+
+This project now uses server-side admin write APIs for the admin panel.
+
+1. Copy `.env.example` to `.env.local` and set:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (server-side only)
+   - `ADMIN_SESSION_SECRET` (random long string)
+   - `BLOB_READ_WRITE_TOKEN` (if image upload is used)
+2. In Supabase SQL Editor, run `scripts/004_enable_rls_and_read_policies.sql`.
+3. Deploy with the same environment variables set in your hosting platform.
+
+After this setup:
+- Storefront stays publicly readable.
+- Admin panel writes go through `app/api/admin/*` with secure HttpOnly cookie session.
+- Anonymous direct writes to tables are blocked by RLS.
+
 ## Learn More
 
 To learn more, take a look at the following resources:
