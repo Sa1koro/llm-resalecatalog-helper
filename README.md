@@ -1,13 +1,33 @@
-# llm-resalecatalog-helper
+# llm-resalecatalog-helper 📦 ResaleBox (断舍离中心)
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+> 一个现代化的全栈二手物品流转与跨平台营销管理系统。
+> A modern, full-stack resale catalog and omnichannel marketing management system.
 
-## Built with v0
+[![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.0-38B2AC)](https://tailwindcss.com/)
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
+[🌍 访问线上预览 (Live Demo)](https://rsb.saikoro.me/) | [📄 查看 Figma 设计复盘](https://www.figma.com/board/MHpSxlS05dWj50BrBSEgyG/ResaleBox?node-id=0-1&t=Z3VEngMscwBNKOwa-1)
 
-[Continue working on v0 →](https://v0.app/chat/projects/prj_KsIq0ZDAaN788uL8piDBMOiqVOZX)
+## ✨ 核心亮点 (Core Features)
 
+- **🌗 现代化 UI 与双语架构**：自研轻量级 i18n 响应系统，支持无缝中英热切换；提取全局 Design Tokens，完美支持深浅色模式 (Dark/Light Mode)。
+- **🛠 沉浸式 B 端管理后台**：支持表格内一键状态切换与拖拽排序 (Drag & Drop)；通过多 Tabs 逻辑降维，优雅处理组合套装 (Bundle) 的跨实体关系绑定与折扣计算。
+- **🚀 自动化全渠道营销 (Omnichannel)**：首创“一键多端铺货”功能，结合浏览器原生 Clipboard/Canvas API，将底层结构化商品数据动态编译为适配小红书、Facebook 等特定语境的“种草文案”及 1080x1080 规范配图。
+- **⚡️ 极致交互体验**：采用高内聚组件化设计，集成 Web Share API，基于乐观更新 (Optimistic UI) 保障弱网环境下的前端零延迟反馈。
+
+## 💻 技术栈 (Tech Stack)
+
+- **前端框架:** Next.js (App Router), React, TypeScript
+- **样式与设计:** Tailwind CSS, Radix UI, CSS Variables
+- **数据与存储:** Supabase (PostgreSQL), Vercel Blob
+- **工程化:** ESLint, Prettier, Vercel CI/CD
+
+## 📂 核心代码导航 (Code Navigation)
+
+- `lib/types.ts` & `app-context.tsx`: 轻量级双语架构与全局状态流转核心实现。
+- `components/item-form-modal.tsx`: 复杂多 Tab 关联数据表单与拖拽上传逻辑。
+- `components/import-tool.tsx`: 帖子跨平台文案 AST 生成与 Canvas 图片处理引擎。
 ## Getting Started
 
 First, run the development server:
