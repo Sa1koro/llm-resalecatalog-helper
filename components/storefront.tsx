@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useApp } from '@/lib/app-context'
 import { HeroSection } from './hero-section'
 import { FilterBar } from './filter-bar'
@@ -12,13 +12,32 @@ import type { Category, Item } from '@/lib/types'
 type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'newest' | 'available-soonest'
 
 export function Storefront() {
-  const { data, loading } = useApp()
+  const { data, loading, selectedItemId, setSelectedItemId, getItemById } = useApp()
   
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<Category | 'all'>('all')
   const [showSold, setShowSold] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('featured')
   const [selectedItem, setSelectedItem] = useState<Item | null>(null)
+
+  // Open detail modal when navigating to a shared link (e.g. /#shop/item/<uuid>)
+  useEffect(() => {
+    if (!loading && selectedItemId) {
+      const item = getItemById(selectedItemId)
+      if (item) {
+        setSelectedItem(item)
+      }
+    }
+  }, [selectedItemId, loading, getItemById])
+
+  const handleCloseModal = () => {
+    setSelectedItem(null)
+    // Clear the item deep-link from the URL hash without triggering a page reload
+    if (selectedItemId) {
+      setSelectedItemId(null)
+      window.history.replaceState(null, '', '#shop')
+    }
+  }
 
   const filteredItems = useMemo(() => {
     let items = [...data.items]
@@ -130,7 +149,7 @@ export function Storefront() {
 
       <ItemDetailModal 
         item={selectedItem} 
-        onClose={() => setSelectedItem(null)} 
+        onClose={handleCloseModal} 
       />
     </div>
   )
