@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   X, 
   ExternalLink, 
@@ -57,6 +57,11 @@ export function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
   const currency = data.settings.currency || 'CAD'
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [copiedLink, setCopiedLink] = useState(false)
+
+  // Reset image index whenever a different item is opened
+  useEffect(() => {
+    setCurrentImageIndex(0)
+  }, [item?.id])
 
   if (!item) return null
 
