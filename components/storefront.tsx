@@ -26,6 +26,10 @@ export function Storefront() {
       const item = getItemById(selectedItemId)
       if (item) {
         setSelectedItem(item)
+      } else {
+        // Item not found (invalid or stale UUID) — clean up the URL
+        setSelectedItemId(null)
+        window.history.replaceState(null, '', '#shop')
       }
     }
   }, [selectedItemId, loading, getItemById])
