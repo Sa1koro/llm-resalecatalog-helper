@@ -22,6 +22,40 @@ const DEFAULT_DATA: AppData = {
   bundles: [],
 }
 
+const LANG_STORAGE_KEY = 'resalebox_lang'
+
+function detectBrowserLang(): Language {
+  // Use navigator.languages first (more complete), then fallback to navigator.language
+  const langs = (typeof navigator !== 'undefined' && navigator.languages && navigator.languages.length)
+    ? navigator.languages
+    : (typeof navigator !== 'undefined' && navigator.language ? [navigator.language] : [])
+
+  const normalized = langs
+    .filter(Boolean)
+    .map(l => String(l).toLowerCase())
+
+  // If any preferred language is Chinese, default to zh
+  if (normalized.some(l => l === 'zh' || l.startsWith('zh-'))) return 'zh'
+
+  // Otherwise default to English
+  return 'en'
+}
+
+function getInitialLang(): Language {
+  // User override wins (persisted)
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = window.localStorage.getItem(LANG_STORAGE_KEY)
+      if (saved === 'zh' || saved === 'en') return saved
+    } catch {
+      // ignore
+    }
+  }
+
+  // Fallback to browser language
+  return detectBrowserLang()
+}
+
 interface AppContextValue {
   // Loading state
   loading: boolean
@@ -86,7 +120,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(DEFAULT_DATA)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [lang, setLang] = useState<Language>('zh')
+  const [lang, setLangState] = useState<Language>(getInitialLang)
   const [isDark, setIsDark] = useState(false)
   const [route, setRouteState] = useState<Route>('shop')
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
@@ -222,6 +256,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const toggleDark = useCallback(() => {
     setIsDark(prev => !prev)
+  }, [])
+
+  const setLang = useCallback((newLang: Language) => {
+    setLangState(newLang)
+    try {
+      window.localStorage.setItem(LANG_STORAGE_KEY, newLang)
+    } catch {
+      // ignore
+    }
   }, [])
 
   const t = useCallback((text: { en: string; zh: string }) => {
