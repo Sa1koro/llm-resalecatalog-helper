@@ -1,6 +1,6 @@
 # llm-resalecatalog-helper 📦 ResaleBox (断舍离中心)
 
-> 一个以 AI 提示词为核心的二手物品流转与跨平台营销管理系统，支持提示词导入/导出与多平台文案分发。
+> 一个以 AI 驱动的二手物品流转与跨平台营销管理系统，支持提示词导入/导出与多平台文案分发。
 > An AI‑prompt–driven resale catalog and omnichannel marketing system with prompt import/export and multi‑platform copy distribution.
 
 [![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
@@ -15,7 +15,7 @@
 - **🌗 现代化 UI 与双语架构**：自研轻量级 i18n 响应系统，支持无缝中英热切换；提取全局 Design Tokens，完美支持深浅色模式 (Dark/Light Mode)。
 - **🤖 AI 提示词工作流 (Prompt Workflow)**：支持提示词导入/导出、模板化管理与批量生成商品文案，形成可复用的内容资产。
 - **📣 多平台文案分发 (Omnichannel Copy Distribution)**：一键生成并适配多平台文案与图文素材，减少重复运营成本。
-- **🛠 沉浸式 B 端管理后台**：支持表格内一键状态切换与拖拽排序 (Drag & Drop)；通过多 Tabs 逻辑降维，优雅处理组合套装 (Bundle) 的跨实体关系绑定��[...]
+- **🛠 沉浸式 B 端管理后台**：支持表格内一键状态切换与拖拽排序 (Drag & Drop)；通过多 Tabs 逻辑降维，优雅处理组合套装 (Bundle) 的跨实体关系绑定[...]
 - **🚀 自动化全渠道营销 (Omnichannel)**：首创“一键多端铺货”功能，结合浏览器原生 Clipboard/Canvas API，将底层结构化商品数据动态编译为适配小红书[...]
 - **⚡️ 极致交互体验**：采用高内聚组件化设计，集成 Web Share API，基于乐观更新 (Optimistic UI) 保障弱网环境下的前端零延迟反馈。
 
