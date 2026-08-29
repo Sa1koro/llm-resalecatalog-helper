@@ -65,6 +65,19 @@ After this setup:
 - Admin panel writes go through `app/api/admin/*` with secure HttpOnly cookie session.
 - Anonymous direct writes to tables are blocked by RLS.
 
+## Keep Supabase Free Plan Active
+
+To avoid Supabase free plan auto-pause after inactivity, this repository includes:
+
+- Workflow: `.github/workflows/keep-supabase-active.yml`
+- Trigger: every 3 days (`cron: 0 3 */3 * *`) + manual run (`workflow_dispatch`)
+- Action: calls `GET {SUPABASE_URL}/rest/v1/settings?select=id&limit=1`
+
+Required GitHub repository secrets:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
 ## Learn More
 
 To learn more, take a look at the following resources:

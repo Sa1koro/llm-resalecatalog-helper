@@ -1,0 +1,31 @@
+name: Keep Supabase Active
+
+on:
+  schedule:
+    - cron: "0 3 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY secret."
+            exit 1
+          fi
+
+          RESPONSE_CODE=$(curl -sS -o /tmp/supabase-keepalive-response.json -w "%{http_code}" \
+            "${SUPABASE_URL}/rest/v1/settings?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}")
+
+          echo "Supabase keepalive status code: ${RESPONSE_CODE}"
+          cat /tmp/supabase-keepalive-response.json
+
+          if [ "${RESPONSE_CODE}" -lt 200 ] || [ "${RESPONSE_CODE}" -ge 300 ]; then
+            exit 1
+          fi
